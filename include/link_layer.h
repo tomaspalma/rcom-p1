@@ -9,6 +9,10 @@
 #define A_RECEIVER 0x01
 #define C_SET 0x03
 #define C_UA 0x07
+#define C_RR_BASE 0x05
+#define C_RR(n) ((n << 7) | C_RR_BASE)
+#define C_REJ_BASE 0X01
+#define C_REJ(n) ((n << 7) | C_REJ_BASE)
 
 #define SETUP_COMM_MSG_SIZE 5
 
@@ -16,6 +20,7 @@
 #define HEADER_END_SIZE 2
 
 #define ESCAPE 0x7D
+#define ESCAPED_DELIMITER 0x5e
 
 typedef enum {
   LlTx,
