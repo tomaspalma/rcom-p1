@@ -19,17 +19,20 @@
 
 int fd;
 bool resend = FALSE;
+int send_tries = 0;
 
 enum OPEN_STATES { START_RCV, FLAG_RCV, A_RCV, C_RCV, BCC_RCV };
 
 void resend_timer(int signal) {
   resend = TRUE;
+  send_tries++;
   alarm(TIMEOUT);
 }
 
 int send_supervised_set() {
   unsigned char set[SETUP_COMM_MSG_SIZE] = { DELIMETER, A_SENDER, C_SET, A_SENDER ^ C_SET, DELIMETER };
-    
+
+  // TODO Refactor this so we exit after alarm tries reach limit  
   if(write(fd, set, SETUP_COMM_MSG_SIZE) == -1) {
     printf("Failed writing SET message to serial port\n");
     return -1;
@@ -88,7 +91,12 @@ void recv_ua_state_machine() {
   unsigned char stop = FALSE;
   while (stop == FALSE) {
     if(resend) {
+      if(send_tries >= 3) {
+        return;
+      }
+
       ua_state = START_RCV;
+      resend = false;
       if(send_supervised_set() != 0) return;
     }
 
@@ -125,6 +133,7 @@ void recv_ua_state_machine() {
     } else if (ua_state == BCC_RCV) {
       if (recv_ua == DELIMETER) {
         alarm(0);
+        send_tries = 0;
         stop = TRUE;
       }
       else
@@ -138,7 +147,6 @@ void recv_ua_state_machine() {
 // LLOPEN
 ////////////////////////////////////////////////
 int llopen(LinkLayer connectionParameters) {
-  printf("called");
   fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY);
   if(fd == -1) return -1;
 
@@ -151,8 +159,9 @@ int llopen(LinkLayer connectionParameters) {
     write(fd, ua, SETUP_COMM_MSG_SIZE);
   } else if(connectionParameters.role == LlTx) {
     (void)signal(SIGALRM, resend_timer);
-    if(send_supervised_set() != 0) return -1;
+
     alarm(connectionParameters.timeout);
+    if(send_supervised_set() != 0) return -1;
     recv_ua_state_machine();
   } else {
     return -1;
