@@ -170,9 +170,13 @@ int llopen(LinkLayer connectionParameters) {
   return 1;
 }
 
-////////////////////////////////////////////////
-// LLWRITE
-////////////////////////////////////////////////
+/**
+ * @brief 
+ * 
+ * @param buf Buffer of bytes of the data
+ * @param bufSize Number of bytes of data
+ * @return int 
+ */
 int llwrite(const unsigned char *buf, int bufSize) {
   // TODO
 
