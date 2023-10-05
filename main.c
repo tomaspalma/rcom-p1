@@ -4,11 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "serial_port.h"
 #include "application_layer.h"
 
-#define BAUDRATE 9600
-#define N_TRIES 3
-#define TIMEOUT 4
 
 // Arguments:
 //   $1: /dev/ttySxx

@@ -4,6 +4,14 @@
 #ifndef _LINK_LAYER_H_
 #define _LINK_LAYER_H_
 
+#define DELIMETER 0x7E
+#define A_SENDER 0x03
+#define A_RECEIVER 0x01
+#define C_SET 0x03
+#define C_UA 0x07
+
+#define SETUP_COMM_MSG_SIZE 5
+
 typedef enum
 {
     LlTx,
