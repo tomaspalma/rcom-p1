@@ -30,7 +30,7 @@ void resend_timer(int signal) {
 int send_supervised_set() {
   unsigned char set[SETUP_COMM_MSG_SIZE] = { DELIMETER, A_SENDER, C_SET, A_SENDER ^ C_SET, DELIMETER };
     
-  if(write(fd, set, SETUP_COMM_MSG_SIZE) != 0) {
+  if(write(fd, set, SETUP_COMM_MSG_SIZE) == -1) {
     printf("Failed writing SET message to serial port\n");
     return -1;
   }
@@ -138,8 +138,9 @@ void recv_ua_state_machine() {
 // LLOPEN
 ////////////////////////////////////////////////
 int llopen(LinkLayer connectionParameters) {
+  printf("called");
   fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY);
-  if(fd != 0) return -1;
+  if(fd == -1) return -1;
 
   setup_port(fd);
 
