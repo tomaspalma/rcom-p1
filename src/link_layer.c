@@ -182,7 +182,7 @@ int assemble_start_frame(unsigned char *frame) {
 
   frame[0] = DELIMETER;
   frame[1] = A_SENDER;
-  frame[2] = ns;
+  frame[2] = (1 << 6) | ns;
   frame[3] = frame[1] ^ frame[2];
 
   return 0;
@@ -263,6 +263,7 @@ int stop_and_wait(unsigned char *frame, int size) {
         if (confirmation_byte == C_RR(1) || confirmation_byte == C_RR(0)) {
           resend = TRUE;
           received = TRUE;
+          ns = (ns + 1) % 2;
         } else if (confirmation_byte == C_REJ(0) ||
                    confirmation_byte == C_REJ(1)) {
           resend = FALSE;
