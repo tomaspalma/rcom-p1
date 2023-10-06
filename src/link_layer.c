@@ -292,7 +292,6 @@ int llwrite(const unsigned char *buf, int bufSize) {
   int byte_stuffing_offset = 0;
   int frame_index = HEADER_START_SIZE;
   for (int i = 0; i < bufSize; i++) {
-    frame_index += (i + byte_stuffing_offset);
     if (buf[i + byte_stuffing_offset] == DELIMETER) {
       frame[frame_index] = ESCAPE;
       frame[frame_index + 1] = ESCAPED_DELIMITER;
@@ -303,7 +302,9 @@ int llwrite(const unsigned char *buf, int bufSize) {
     }
 
     bcc2 ^= buf[i + byte_stuffing_offset];
+
     frame[frame_index] = buf[i + byte_stuffing_offset];
+    frame_index += (1 + byte_stuffing_offset);
   }
 
   assemble_end_frame(bufSize + HEADER_START_SIZE, frame, bcc2);
@@ -313,6 +314,8 @@ int llwrite(const unsigned char *buf, int bufSize) {
 
   if (stop_and_wait(frame, number_of_wrote_bytes) != 0) {
   }
+
+  printf("\n");
 
   return number_of_wrote_bytes;
 }
