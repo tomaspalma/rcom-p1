@@ -387,6 +387,9 @@ int llread(unsigned char *packet) {
           write(fd, rejection_frame, 5);
           return 0;
         }
+      } else {
+        packet[i] = byte;
+        i++;
       }
     }
     else if (read_state == ESC_RCV) {
