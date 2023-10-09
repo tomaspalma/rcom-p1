@@ -25,6 +25,8 @@ int nr = 1;
 
 enum OPEN_STATES { START_RCV, FLAG_RCV, A_RCV, C_RCV, BCC_RCV };
 
+enum READ_STATES { START, READ_FLAG, READ_A, READ_C, READ_DATA, ESC_RCV};
+
 void resend_timer(int signal) {
   resend = TRUE;
   send_tries++;
@@ -324,7 +326,81 @@ int llwrite(const unsigned char *buf, int bufSize) {
 // LLREAD
 ////////////////////////////////////////////////
 int llread(unsigned char *packet) {
-  // TODO
+  unsigned char byte = 0;
+  unsigned char frame_number = 2;
+  enum READ_STATES read_state = START;
+  unsigned char stop = FALSE;
+  int i = 0;
+  while (!stop) {
+    read(fd, &byte, 1);
+
+    if (read_state == START) {
+      if (byte == DELIMETER)
+        read_state = READ_FLAG;
+      else
+        read_state = START;
+    }
+    else if (read_state == READ_FLAG) {
+      if (byte == A_SENDER)
+        read_state = READ_A;
+      else
+        read_state = START;
+    }
+    else if (read_state == READ_A) {
+      if (byte == C_NUMBER0 || byte == C_NUMBER1) {
+        read_state = READ_C;
+        frame_number = byte;
+      }
+      else if (byte == DELIMETER)
+        read_state = READ_FLAG;
+      else
+        read_state = START;
+    }
+    else if (read_state == READ_C) {
+      if (byte == (A_SENDER ^ frame_number))
+        read_state = READ_DATA;
+      else if (byte == DELIMETER)
+        read_state = READ_FLAG;
+      else
+        read_state = START;
+    }
+    else if (read_state == READ_DATA) {
+      if (byte == ESCAPE)
+        read_state = ESC_RCV;
+      else if (byte == DELIMETER) {
+        unsigned char recv_bcc2 = packet[i-1];
+        packet[--i] = 0;
+
+        unsigned char calc_bcc2 = packet[0];
+        for (unsigned int j = 1; j < i; j++)
+          calc_bcc2 ^= packet[j];
+        
+        if (recv_bcc2 == calc_bcc2) {
+          stop = TRUE;
+          unsigned char acceptance_frame[5] = { DELIMETER, A_RECEIVER, C_RR(nr), A_RECEIVER ^ C_RR(nr), DELIMETER };
+          write(fd, acceptance_frame, 5);
+          nr = (nr + 1) % 2;
+          return i;
+        }
+        else {
+          unsigned char rejection_frame[5] = { DELIMETER, A_RECEIVER, C_REJ(nr), A_RECEIVER & C_REJ(nr), DELIMETER };
+          write(fd, rejection_frame, 5);
+          return 0;
+        }
+      }
+    }
+    else if (read_state == ESC_RCV) {
+      read_state = READ_DATA;
+      if (byte == ESCAPED_DELIMITER)
+        packet[i++] = DELIMETER;
+      else if (byte == ESCAPED_ESCAPE)
+        packet[i++] = ESCAPE;
+      else {
+        packet[i++] = ESCAPE;
+        packet[i++] = byte;
+      }
+    }
+  }
 
   return 0;
 }

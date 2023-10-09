@@ -9,6 +9,8 @@
 #define A_RECEIVER 0x01
 #define C_SET 0x03
 #define C_UA 0x07
+#define C_NUMBER0 0x00
+#define C_NUMBER1 0x40
 #define C_RR_BASE 0x05
 #define C_RR(n) ((n << 7) | C_RR_BASE)
 #define C_REJ_BASE 0X01
@@ -21,6 +23,7 @@
 
 #define ESCAPE 0x7D
 #define ESCAPED_DELIMITER 0x5e
+#define ESCAPED_ESCAPE 0x5d
 
 typedef enum {
   LlTx,
