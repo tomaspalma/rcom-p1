@@ -205,6 +205,7 @@ int stop_and_wait(unsigned char *frame, int size) {
   alarm(TIMEOUT);
   int ntries = 0;
   bool received = FALSE;
+  send_tries = 0;
   resend = FALSE;
 
   if (write(fd, frame, size) == -1) {
@@ -213,7 +214,8 @@ int stop_and_wait(unsigned char *frame, int size) {
   }
 
   enum OPEN_STATES current_state = START_RCV;
-  unsigned char buf;
+  unsigned char buf = 0;
+  unsigned char confirmation_byte = 0;
   while (!received) {
     if (resend) {
       if (send_tries >= N_TRIES) {
@@ -229,7 +231,6 @@ int stop_and_wait(unsigned char *frame, int size) {
     }
 
     read(fd, &buf, 1);
-    unsigned char confirmation_byte = 0;
 
     if (current_state == START_RCV) {
       if (buf == DELIMETER)
@@ -244,8 +245,10 @@ int stop_and_wait(unsigned char *frame, int size) {
     } else if (current_state == A_RCV) {
       if (buf == DELIMETER)
         current_state = FLAG_RCV;
-      else if (buf == C_RR(nr))
+      else if (buf == C_RR(nr)) {
+        confirmation_byte = buf;
         current_state = C_RCV;
+      }
       else
         current_state = START_RCV;
     } else if (current_state == C_RCV) {
@@ -253,7 +256,6 @@ int stop_and_wait(unsigned char *frame, int size) {
         current_state = FLAG_RCV;
       else if (buf == (A_RECEIVER ^ C_RR(nr)) ||
                buf == (A_RECEIVER ^ C_REJ(nr))) {
-        confirmation_byte = buf;
         current_state = BCC_RCV;
       } else
         current_state = START_RCV;
@@ -269,9 +271,10 @@ int stop_and_wait(unsigned char *frame, int size) {
         } else if (confirmation_byte == C_REJ(0) ||
                    confirmation_byte == C_REJ(1)) {
           resend = FALSE;
-        }
-      } else
+        } 
+      } else {
         current_state = START_RCV;
+      }
     }
   }
 
@@ -314,7 +317,7 @@ int llwrite(const unsigned char *buf, int bufSize) {
   int number_of_wrote_bytes =
       bufSize + byte_stuffing_offset + HEADER_START_SIZE + HEADER_END_SIZE;
 
-  if (stop_and_wait(frame, number_of_wrote_bytes) != 0) {
+  if (stop_and_wait(frame, number_of_wrote_bytes) == -1) {
   }
 
   printf("\n");
@@ -404,6 +407,7 @@ int llread(unsigned char *packet) {
       }
     }
   }
+
 
   return 0;
 }
