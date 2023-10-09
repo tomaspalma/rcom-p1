@@ -3,9 +3,70 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 
 #include "application_layer.h"
 #include "link_layer.h"
+#include "utils.h"
+
+int send_file(const char *filename) {
+  if(filename == NULL) {
+    printf("One or more of the arguments passed are NULL");
+    return -1;
+  }
+
+  FILE *file;
+  if((file = fopen(filename, "r")) == NULL) {
+    printf("Failed opening file\n");
+    return -1;
+  }
+
+  int file_size = get_size_of_file(file);
+  if(send_control_frame(filename, file_size == -1)) {
+    return -1;
+  }
+
+  while(file_size > 0) {
+    
+    unsigned char data_packet[3 + ]
+  }
+}
+
+int send_control_frame(const char *filename, int file_size) {
+  if(filename == NULL) {
+    return -1;
+  }
+  
+  unsigned char filename_len = strlen(filename);
+  unsigned char file_size_bytes = ((get_no_of_bits(file_size) + 7) / 8);
+  int buf_size = 5 + filename_len + file_size_bytes;
+  unsigned char control[buf_size];
+  memset(control, 0, buf_size);
+
+  control[0] = CONTROL_START;
+
+  // File size
+  control[1] = FILE_SIZE;
+  control[2] = file_size_bytes;
+
+  printf("File size: %d\n", file_size);
+  printf("File size bytes: %d\n", file_size_bytes);
+  for(int i = 0; i < file_size_bytes; i++) {
+    control[3 + i] = (file_size & 0xff);
+    file_size >>= 8;
+  }
+
+  unsigned char index = file_size_bytes + 2 + 1;
+  control[index] = FILE_NAME;
+  control[index + 1] = filename_len;
+  strcpy(control + index + 2, filename);
+
+  if(llwrite(control, buf_size) == -1) {
+    return -1;
+  }
+
+  return 0;
+}
 
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename) {
@@ -33,8 +94,13 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
   conn_params.timeout = timeout;
   conn_params.nRetransmissions = nTries;
 
-  if (llopen(conn_params) == -1) {
+  if(llopen(conn_params) == -1) {
+    return;
   }
 
-  printf("??????????????\n");
+  if(conn_params.role == LlTx) {
+    if(send_file(filename) == -1) {
+      return;
+    }
+  }
 }

@@ -4,6 +4,13 @@
 #ifndef _APPLICATION_LAYER_H_
 #define _APPLICATION_LAYER_H_
 
+#define FILE_NAME 1
+#define FILE_SIZE 0
+
+#define CONTROL_DATA 1
+#define CONTROL_START 2
+#define CONTROL_END 3
+
 // Application layer main function.
 // Arguments:
 //   serialPort: Serial port name (e.g., /dev/ttyS0).
@@ -14,5 +21,9 @@
 //   filename: Name of the file to send / receive.
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename);
+
+int send_file(const char *filename);
+
+int send_control_frame(const char *filename, int file_size);
 
 #endif // _APPLICATION_LAYER_H_

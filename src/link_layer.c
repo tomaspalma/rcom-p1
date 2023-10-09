@@ -202,6 +202,7 @@ int assemble_end_frame(int offset, unsigned char *frame, unsigned char bcc2) {
 }
 
 int stop_and_wait(unsigned char *frame, int size) {
+  printf("Stop and waitting\n");
   alarm(TIMEOUT);
   int ntries = 0;
   bool received = FALSE;
@@ -268,6 +269,7 @@ int stop_and_wait(unsigned char *frame, int size) {
           resend = TRUE;
           received = TRUE;
           ns = (ns + 1) % 2;
+          nr = (nr + 1) % 2;
         } else if (confirmation_byte == C_REJ(0) ||
                    confirmation_byte == C_REJ(1)) {
           resend = FALSE;
@@ -319,8 +321,6 @@ int llwrite(const unsigned char *buf, int bufSize) {
 
   if (stop_and_wait(frame, number_of_wrote_bytes) == -1) {
   }
-
-  printf("\n");
 
   return number_of_wrote_bytes;
 }

@@ -7,6 +7,8 @@
 #include "serial_port.h"
 #include "application_layer.h"
 
+#include "utils.h"
+
 
 // Arguments:
 //   $1: /dev/ttySxx

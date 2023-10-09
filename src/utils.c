@@ -11,3 +11,7 @@ int get_size_of_file(FILE* file) {
 
     return file_size;
 }
+
+int get_no_of_bits(int n) {
+	return ceil(log2(n)) + 1;
+}
