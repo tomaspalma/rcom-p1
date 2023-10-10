@@ -1,42 +1,46 @@
 // Application layer protocol implementation
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>
 
 #include "application_layer.h"
 #include "link_layer.h"
 #include "utils.h"
 
 int send_file(const char *filename) {
-  if(filename == NULL) {
+  if (filename == NULL) {
     printf("One or more of the arguments passed are NULL");
     return -1;
   }
 
   FILE *file;
-  if((file = fopen(filename, "r")) == NULL) {
+  if ((file = fopen(filename, "r")) == NULL) {
     printf("Failed opening file\n");
     return -1;
   }
 
   int file_size = get_size_of_file(file);
-  if(send_control_frame(filename, file_size == -1)) {
+  if (send_control_frame(filename, file_size == -1)) {
     return -1;
   }
 
-  while(file_size > 0) {
-    
-    unsigned char data_packet[3 + ]
+  unsigned char packet[3 + MAX_DATAFIELD_SIZE];
+  packet[0] = CONTROL_DATA;
+  int bytes_read;
+  while ((bytes_read = fread(packet + 3, 1, MAX_DATAFIELD_SIZE, file)) > 0) {
+    int bytes = (get_no_of_bits(bytes_read) + 7) / 8;
+    packet[1] = (bytes & 0xff00) >> 8;
+    packet[2] = bytes & 0xff;
   }
 }
 
 int send_control_frame(const char *filename, int file_size) {
-  if(filename == NULL) {
+  if (filename == NULL) {
     return -1;
   }
-  
+
   unsigned char filename_len = strlen(filename);
   unsigned char file_size_bytes = ((get_no_of_bits(file_size) + 7) / 8);
   int buf_size = 5 + filename_len + file_size_bytes;
@@ -51,7 +55,7 @@ int send_control_frame(const char *filename, int file_size) {
 
   printf("File size: %d\n", file_size);
   printf("File size bytes: %d\n", file_size_bytes);
-  for(int i = 0; i < file_size_bytes; i++) {
+  for (int i = 0; i < file_size_bytes; i++) {
     control[3 + i] = (file_size & 0xff);
     file_size >>= 8;
   }
@@ -61,7 +65,7 @@ int send_control_frame(const char *filename, int file_size) {
   control[index + 1] = filename_len;
   strcpy(control + index + 2, filename);
 
-  if(llwrite(control, buf_size) == -1) {
+  if (llwrite(control, buf_size) == -1) {
     return -1;
   }
 
@@ -94,13 +98,23 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
   conn_params.timeout = timeout;
   conn_params.nRetransmissions = nTries;
 
-  if(llopen(conn_params) == -1) {
+  if (llopen(conn_params) == -1) {
     return;
   }
 
-  if(conn_params.role == LlTx) {
-    if(send_file(filename) == -1) {
+  if (conn_params.role == LlTx) {
+    unsigned char *msg = "hello";
+    llwrite(msg, 5);
+    llwrite(msg, 5);
+    /*if(send_file(filename) == -1) {
       return;
-    }
+    }*/
+  } else {
+    unsigned char msg[5];
+    llread(msg);
+    printf("%s\n", msg);
+    unsigned char m[5];
+    llread(m);
+    printf("%s\n", m);
   }
 }

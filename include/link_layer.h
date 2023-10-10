@@ -25,6 +25,8 @@
 #define ESCAPED_DELIMITER 0x5e
 #define ESCAPED_ESCAPE 0x5d
 
+#define MAX_DATAFIELD_SIZE 1024
+
 typedef enum {
   LlTx,
   LlRx,
