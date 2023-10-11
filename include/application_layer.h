@@ -22,8 +22,11 @@
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename);
 
-int send_file(const char *filename);
+int transmitter_application_layer(const char *filename);
 
-int send_control_frame(const char *filename, int file_size);
+int send_file(FILE *file);
+
+int send_control_frame(const char *filename, int file_size,
+                       int app_layer_control);
 
 #endif // _APPLICATION_LAYER_H_

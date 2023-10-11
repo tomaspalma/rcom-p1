@@ -9,20 +9,9 @@
 #include "link_layer.h"
 #include "utils.h"
 
-int send_file(const char *filename) {
-  if (filename == NULL) {
+int send_file(FILE *file) {
+  if (file == NULL) {
     printf("One or more of the arguments passed are NULL");
-    return -1;
-  }
-
-  FILE *file;
-  if ((file = fopen(filename, "r")) == NULL) {
-    printf("Failed opening file\n");
-    return -1;
-  }
-
-  int file_size = get_size_of_file(file);
-  if (send_control_frame(filename, file_size == -1)) {
     return -1;
   }
 
@@ -30,14 +19,20 @@ int send_file(const char *filename) {
   packet[0] = CONTROL_DATA;
   int bytes_read;
   while ((bytes_read = fread(packet + 3, 1, MAX_DATAFIELD_SIZE, file)) > 0) {
-    int bytes = (get_no_of_bits(bytes_read) + 7) / 8;
-    packet[1] = (bytes & 0xff00) >> 8;
-    packet[2] = bytes & 0xff;
+    packet[1] = (bytes_read & 0xff00) >> 8;
+    packet[2] = bytes_read & 0xff;
+    for (int i = 0; i < bytes_read; i++) {
+      if (llwrite(packet + 3, bytes_read) == -1) {
+        return -1;
+      }
+    }
   }
 }
 
-int send_control_frame(const char *filename, int file_size) {
+int send_control_frame(const char *filename, int file_size,
+                       int app_layer_control) {
   if (filename == NULL) {
+    printf("Filename passed as argument is NULL\n");
     return -1;
   }
 
@@ -47,7 +42,7 @@ int send_control_frame(const char *filename, int file_size) {
   unsigned char control[buf_size];
   memset(control, 0, buf_size);
 
-  control[0] = CONTROL_START;
+  control[0] = app_layer_control;
 
   // File size
   control[1] = FILE_SIZE;
@@ -66,10 +61,28 @@ int send_control_frame(const char *filename, int file_size) {
   strcpy(control + index + 2, filename);
 
   if (llwrite(control, buf_size) == -1) {
+    printf("Llwrite failed on trying to send the control frame for start\n");
     return -1;
   }
 
   return 0;
+}
+
+int transmitter_application_layer(const char *filename) {
+  FILE *file = fopen(filename, "r");
+
+  int file_size = get_size_of_file(file);
+  if (send_control_frame(filename, file_size, CONTROL_START) == -1) {
+    return -1;
+  }
+
+  if (send_file(filename) == -1) {
+    return -1;
+  }
+
+  if (send_control_frame(filename, file_size, CONTROL_END) == -1) {
+    return -1;
+  }
 }
 
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
@@ -103,12 +116,16 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
   }
 
   if (conn_params.role == LlTx) {
+    /*if (transmitter_application_layer(filename) == -1) {
+      return -1;
+    }*/
+
     unsigned char *msg = "hello";
     llwrite(msg, 5);
-    llwrite(msg, 5);
-    /*if(send_file(filename) == -1) {
-      return;
-    }*/
+    llwrite(msg, 5); /*if(send_file(filename) == -1) {
+
+   return;
+ }*/
   } else {
     unsigned char msg[5];
     llread(msg);

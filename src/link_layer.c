@@ -380,7 +380,6 @@ int llread(unsigned char *packet) {
       if (byte == ESCAPE)
         read_state = ESC_RCV;
       else if (byte == DELIMETER) {
-        printf("Odeio-o tanto...\n");
         unsigned char recv_bcc2 = packet[i - 1];
         packet[--i] = 0;
 
