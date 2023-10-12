@@ -4,10 +4,133 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "application_layer.h"
 #include "link_layer.h"
 #include "utils.h"
+
+extern int fd;
+
+int read_control_frame(int app_layer_control, int *file_size, unsigned char *filename) {
+  if(*file_size != 0) {
+    printf("Initial value of file size needs to be 0\n");
+    return -1;
+  } else if(filename != NULL) {
+    printf("Filename must be NULL");
+    return -1;
+  }
+
+  //unsigned char buf = 0;
+
+  int stop = 0;
+
+  int t = INVALID;
+  int l = INVALID;
+  int length_read = 0;
+  int v_left_to_read = 0;
+
+  unsigned char buf[BUFSIZ];
+
+  if(llread(&buf) == 0) { 
+    return -1;
+  }
+
+  if(buf[0] != app_layer_control) {
+    printf("App layer control wrong\n");
+    return -1;
+  }
+
+  READ_CONTROL_STATE state = READ_FILESIZE;
+  int index = 1;
+  while(!stop) {
+    if(buf[index++] == 0 && state == READ_FILESIZE) {
+        l = buf[index++];
+
+        int a = l;
+        for(int i = index; i < l + index; i++) {
+          *file_size |= (buf << (8 * (l - a)));
+          a--;
+          index++;
+        }
+
+        state = READ_FILENAME;
+      }
+    } else if(buf[index++] == 1 && state == READ_FILENAME) {
+      l = buf[index++];
+
+      for(int i = 0; i < l; i++) {
+        filename[i] = buf[index + i];
+      }
+
+      stop = 1;
+    }
+  }
+
+  return 0;
+}
+
+int read_file(int file_size, unsigned char *filename) {
+  if(filename == NULL) {
+    printf("Filename cannot be null\n");
+    return -1;
+  }
+
+  unsigned char buf = 0;
+  int bytes_read = 0;
+  READ_FILE_STATE read_state = CONTROL_DATA;
+
+  int l2 = 0;
+  int l1 = 0;
+  int packet_size = 0;
+  int k = 0;
+
+  int stop = 0;
+  while(!stop) {
+    read(fd, &buf, 1);
+
+    if(read_state == READ_CONTROL_DATA) {
+      if(buf == CONTROL_DATA) {
+        read_state = READ_DATA_L2;
+      }
+    } else if(read_state == READ_DATA_L2) {
+      l2 = buf;
+      read_state = READ_DATA_L1;
+    } else if(read_state == READ_DATA_L1) {
+      l1 = buf;
+
+      packet_size |= ((l2 << 8) | l1);
+      k = 256 * l2 + l1;
+      read_state = READ_DATA;
+    } else if(read_state == READ_DATA) {
+      
+    }
+  }
+
+  return 0;
+}
+
+int receiver_application_layer() {
+  unsigned char *filename = NULL;
+
+  int file_size_start = 0;
+  if(read_control_frame(CONTROL_START, &file_size_start, filename) == -1) {
+    printf("");
+    return -1;
+  }
+
+  if(read_file(file_size_start) == -1) {
+    return -1;
+  }
+
+  free(filename);
+  filename = NULL;
+  int file_size_stop = 0;
+  if(read_control_frame(CONTROL_END, &file_size_stop) == -1) {
+    printf("");
+    return -1;
+  }
+}
 
 int send_file(FILE *file) {
   if (file == NULL) {
