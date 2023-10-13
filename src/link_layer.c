@@ -108,7 +108,7 @@ void recv_ua_state_machine() {
 
     read(fd, &recv_ua, 1);
 
-    printf("Received: %x\n", recv_ua);
+    // printf("Received: %x\n", recv_ua);
 
     if (ua_state == START_RCV) {
       if (recv_ua == DELIMETER)
@@ -209,9 +209,9 @@ int stop_and_wait(unsigned char *frame, int size) {
   send_tries = 0;
   resend = FALSE;
 
-  for (int i = 0; i < size; i++) {
-    printf("Sent: %x\n", frame[i]);
-  }
+  // for (int i = 0; i < size; i++) {
+  //   printf("Sent: %x\n", frame[i]);
+  // }
 
   if (write(fd, frame, size) == -1) {
     printf("Error writing frame in the link layer!");
@@ -346,10 +346,10 @@ int llread(unsigned char *packet) {
 
   int i = 0;
   while (!stop) {
-    printf("State: %d\n", read_state);
+    // printf("State: %d\n", read_state);
     read(fd, &byte, 1);
 
-    printf("Read: %x\n", byte);
+    // printf("Read: %x\n", byte);
 
     if (read_state == START) {
       if (byte == DELIMETER)
