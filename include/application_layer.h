@@ -40,8 +40,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 int transmitter_application_layer(const char *filename);
 int receiver_application_layer();
 
-int read_control_frame(int app_layer_control, int *file_size,
-                       unsigned char *filename);
+unsigned char *read_control_frame(int app_layer_control, int *file_size);
 int read_file(int file_size, unsigned char *filename);
 
 int send_file(FILE *file);
