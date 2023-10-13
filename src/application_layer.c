@@ -139,18 +139,20 @@ int send_file(FILE *file) {
     return -1;
   }
 
-  unsigned char *packet = (unsigned char *)malloc(3 + MAX_DATAFIELD_SIZE);
+  unsigned char packet[10969];
   packet[0] = CONTROL_DATA;
   int bytes_read;
-  while ((bytes_read = fread(packet + 3, sizeof(*packet), MAX_DATAFIELD_SIZE,
-                             file)) > 0) {
-    printf("Bytes read: %d\n", bytes_read);
-    packet[1] = (bytes_read & 0xff00) >> 8;
-    packet[2] = bytes_read & 0xff;
-    if (llwrite(packet + 3, bytes_read) == -1) {
-      return -1;
-    }
-  }
+
+  fread(packet, sizeof(unsigned char), 10969, file);
+  // while ((bytes_read = fread(packet, sizeof(unsigned char), 4, file)) > 0) {
+  //   printf("Bytes read: %d\n", bytes_read);
+  //   packet[1] = (bytes_read & 0xff00) >> 8;
+  //   packet[2] = bytes_read & 0xff;
+  //   if (llwrite(packet + 3, bytes_read) == -1) {
+  //     return -1;
+  //   }
+  // }
+  return 0;
 }
 
 int send_control_frame(const char *filename, int file_size,
@@ -196,20 +198,21 @@ int send_control_frame(const char *filename, int file_size,
 
 int transmitter_application_layer(const char *filename) {
   FILE *file = fopen(filename, "r");
+  if (file == NULL) {
+    printf("Error opening file %s\n", filename);
+    return -1;
+  }
 
   printf("A\n");
   int file_size = get_size_of_file(file);
-  printf("B\n");
+  printf("File size: %d\n", file_size);
   if (send_control_frame(filename, file_size, CONTROL_START) == -1) {
     return -1;
   }
 
-  printf("Before send file\n");
-  if (send_file(filename) == -1) {
+  if (send_file(file) == -1) {
     return -1;
   }
-
-  printf("After send file\n");
 
   if (send_control_frame(filename, file_size, CONTROL_END) == -1) {
     return -1;
@@ -247,23 +250,23 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
   }
 
   if (conn_params.role == LlTx) {
-    if (transmitter_application_layer(filename) == -1) {
-      printf("Transmitting application layer failed!\n");
-      return -1;
-    }
-    // unsigned char *msg = "hello";
-    // llwrite(msg, 5);
-    // llwrite(msg, 5);
+    // if (transmitter_application_layer(filename) == -1) {
+    //   printf("Transmitting application layer failed!\n");
+    //   return -1;
+    // }
+    unsigned char *msg = "hello";
+    llwrite(msg, 5);
+    llwrite(msg, 5);
   } else {
-    if (receiver_application_layer() == -1) {
-      printf("Receiving application layer failed!\n");
-      return -1;
-    }
-    // unsigned char msg[5];
-    // llread(msg);
-    // printf("%s\n", msg);
-    // unsigned char m[5];
-    // llread(m);
-    // printf("%s\n", m);
+    // if (receiver_application_layer() == -1) {
+    //   printf("Receiving application layer failed!\n");
+    //   return -1;
+    // }
+    unsigned char msg[5];
+    llread(msg);
+    printf("%s\n", msg);
+    unsigned char m[5];
+    llread(m);
+    printf("%s\n", m);
   }
 }

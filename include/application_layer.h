@@ -14,18 +14,17 @@
 #define INVALID -1
 
 typedef enum {
-    READ_CONTROL_START,
-    READ_FILESIZE,
-    READ_FILENAME,
+  READ_CONTROL_START,
+  READ_FILESIZE,
+  READ_FILENAME,
 } READ_CONTROL_STATE;
 
 typedef enum {
-    READ_CONTROL_DATA,
-    READ_DATA_L1,
-    READ_DATA_L2,
-    READ_DATA
+  READ_CONTROL_DATA,
+  READ_DATA_L1,
+  READ_DATA_L2,
+  READ_DATA
 } READ_FILE_STATE;
-
 
 // Application layer main function.
 // Arguments:
@@ -41,7 +40,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 int transmitter_application_layer(const char *filename);
 int receiver_application_layer();
 
-int read_control_frame(int app_layer_control, int *file_size, unsigned char *filename);
+int read_control_frame(int app_layer_control, int *file_size,
+                       unsigned char *filename);
 int read_file(int file_size, unsigned char *filename);
 
 int send_file(FILE *file);

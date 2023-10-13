@@ -1,17 +1,15 @@
 #include "utils.h"
 
-int get_size_of_file(FILE* file) {
-    if(file == NULL) {
-        return -1;
-    }
+int get_size_of_file(FILE *file) {
+  if (file == NULL) {
+    return -1;
+  }
 
-    fseek(file, 0L, SEEK_END);
-    int file_size = ftell(file);
-    fseek(file, 0L, SEEK_SET);
+  fseek(file, 0L, SEEK_END);
+  int file_size = ftell(file);
+  rewind(file);
 
-    return file_size;
+  return file_size;
 }
 
-int get_no_of_bits(int n) {
-	return ceil(log2(n)) + 1;
-}
+int get_no_of_bits(int n) { return ceil(log2(n)) + 1; }
