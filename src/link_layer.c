@@ -202,7 +202,6 @@ int assemble_end_frame(int offset, unsigned char *frame, unsigned char bcc2) {
 }
 
 int stop_and_wait(unsigned char *frame, int size) {
-  printf("Stop and waitting\n");
   alarm(TIMEOUT);
   int ntries = 0;
   bool received = FALSE;
@@ -217,6 +216,8 @@ int stop_and_wait(unsigned char *frame, int size) {
     printf("Error writing frame in the link layer!");
     return -1;
   }
+
+  bool cancel = 0;
 
   enum OPEN_STATES current_state = START_RCV;
   unsigned char buf = 0;
@@ -237,20 +238,21 @@ int stop_and_wait(unsigned char *frame, int size) {
 
     read(fd, &buf, 1);
 
-    if (current_state == START_RCV) {
+    if (current_state == START_RCV) { // 0
       if (buf == DELIMETER)
         current_state = FLAG_RCV;
-    } else if (current_state == FLAG_RCV) {
+    } else if (current_state == FLAG_RCV) { // 1
       if (buf == DELIMETER)
         current_state = FLAG_RCV;
       else if (buf == A_RECEIVER)
         current_state = A_RCV;
       else
         current_state = START_RCV;
-    } else if (current_state == A_RCV) {
+    } else if (current_state == A_RCV) { // 2
       if (buf == DELIMETER)
         current_state = FLAG_RCV;
-      else if (buf == C_RR(nr)) {
+      else if (buf == C_RR(0) || buf == C_RR(1) || buf == C_REJ(0) ||
+               buf == C_REJ(1)) {
         confirmation_byte = buf;
         current_state = C_RCV;
       } else
@@ -264,18 +266,26 @@ int stop_and_wait(unsigned char *frame, int size) {
       } else
         current_state = START_RCV;
     } else if (current_state == BCC_RCV) {
+      // if (cancel) {
+      // current_state = START_RCV;
+      // }
       if (buf == DELIMETER) {
-        alarm(0);
         send_tries = 0;
 
         if (confirmation_byte == C_RR(1) || confirmation_byte == C_RR(0)) {
-          resend = TRUE;
+          if (confirmation_byte != C_RR(nr)) {
+            current_state = START_RCV;
+            resend = false;
+          }
+
+          alarm(0);
           received = TRUE;
           ns = (ns + 1) % 2;
           nr = (nr + 1) % 2;
         } else if (confirmation_byte == C_REJ(0) ||
                    confirmation_byte == C_REJ(1)) {
           resend = FALSE;
+          current_state = START_RCV;
         }
       } else {
         current_state = START_RCV;
@@ -328,6 +338,7 @@ int llwrite(const unsigned char *buf, int bufSize) {
       bufSize + byte_stuffing_offset + HEADER_START_SIZE + HEADER_END_SIZE;
 
   if (stop_and_wait(frame, number_of_wrote_bytes) == -1) {
+    return -1;
   }
 
   return number_of_wrote_bytes;
@@ -349,7 +360,7 @@ int llread(unsigned char *packet) {
     // printf("State: %d\n", read_state);
     read(fd, &byte, 1);
 
-    // printf("Read: %x\n", byte);
+    int cancel = 0;
 
     if (read_state == START) {
       if (byte == DELIMETER)
@@ -363,6 +374,9 @@ int llread(unsigned char *packet) {
         read_state = START;
     } else if (read_state == READ_A) {
       if (byte == C_NUMBER0 || byte == C_NUMBER1) {
+        if (byte != ns) {
+          cancel = 1;
+        }
         read_state = READ_C;
         frame_number = byte;
       } else if (byte == DELIMETER)
@@ -380,6 +394,8 @@ int llread(unsigned char *packet) {
       if (byte == ESCAPE)
         read_state = ESC_RCV;
       else if (byte == DELIMETER) {
+        if (cancel)
+          continue;
         unsigned char recv_bcc2 = packet[i - 1];
         packet[--i] = 0;
 
@@ -389,22 +405,23 @@ int llread(unsigned char *packet) {
 
         if (recv_bcc2 == calc_bcc2) {
           stop = TRUE;
+          printf("A receiver: %d\n", A_RECEIVER);
           unsigned char acceptance_frame[5] = {DELIMETER, A_RECEIVER, C_RR(nr),
                                                A_RECEIVER ^ C_RR(nr),
                                                DELIMETER};
           printf("Accepted\n");
           write(fd, acceptance_frame, 5);
           nr = (nr + 1) % 2;
+          ns = (ns + 1) % 2;
           return i;
-        } else {
+        } else if (recv_bcc2 != calc_bcc2) {
           unsigned char rejection_frame[5] = {DELIMETER, A_RECEIVER, C_REJ(nr),
                                               A_RECEIVER & C_REJ(nr),
                                               DELIMETER};
-          printf("rejection!\n");
           write(fd, rejection_frame, 5);
           return 0;
         }
-      } else {
+      } else if (!cancel) {
         packet[i] = byte;
         i++;
       }
@@ -419,6 +436,8 @@ int llread(unsigned char *packet) {
         packet[i++] = byte;
       }
     }
+
+    cancel = 0;
   }
 
   return 0;
