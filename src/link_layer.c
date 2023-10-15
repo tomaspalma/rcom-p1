@@ -14,7 +14,9 @@
 #include "link_layer.h"
 #include "serial_port.h"
 
-// MISC
+enum OPEN_STATES { START_RCV, FLAG_RCV, A_RCV, C_RCV, BCC_RCV };
+
+enum READ_STATES { START, READ_FLAG, READ_A, READ_C, READ_DATA, ESC_RCV };
 
 int fd;
 bool resend = FALSE;
@@ -23,22 +25,18 @@ int send_tries = 0;
 int ns = 0;
 int nr = 1;
 
-enum OPEN_STATES { START_RCV, FLAG_RCV, A_RCV, C_RCV, BCC_RCV };
-
-enum READ_STATES { START, READ_FLAG, READ_A, READ_C, READ_DATA, ESC_RCV };
-
 void resend_timer(int signal) {
   resend = TRUE;
   send_tries++;
   alarm(TIMEOUT);
 }
 
-int send_supervised_set() {
-  unsigned char set[SETUP_COMM_MSG_SIZE] = {DELIMETER, A_SENDER, C_SET,
-                                            A_SENDER ^ C_SET, DELIMETER};
+int send_supervised_frame(int address, int control_byte) {
+  unsigned char frame[SUPERVISION_FRAME_SIZE] = {
+      DELIMETER, address, control_byte, address ^ control_byte, DELIMETER};
 
   // TODO Refactor this so we exit after alarm tries reach limit
-  if (write(fd, set, SETUP_COMM_MSG_SIZE) == -1) {
+  if (write(fd, frame, SUPERVISION_FRAME_SIZE) == -1) {
     printf("Failed writing SET message to serial port\n");
     return -1;
   }
@@ -46,7 +44,8 @@ int send_supervised_set() {
   return 0;
 }
 
-void recv_set_state_machine() {
+void recv_supervision_state_machine(unsigned char address_byte,
+                                    unsigned char control_byte) {
   enum OPEN_STATES set_state = START_RCV;
   unsigned char recv_set = 0;
   unsigned char stop = FALSE;
@@ -63,25 +62,26 @@ void recv_set_state_machine() {
     } else if (set_state == FLAG_RCV) {
       if (recv_set == DELIMETER)
         set_state = FLAG_RCV;
-      else if (recv_set == A_SENDER)
+      else if (recv_set == address_byte)
         set_state = A_RCV;
       else
         set_state = START_RCV;
     } else if (set_state == A_RCV) {
       if (recv_set == DELIMETER)
         set_state = FLAG_RCV;
-      else if (recv_set == C_SET)
+      else if (recv_set == control_byte)
         set_state = C_RCV;
       else
         set_state = START_RCV;
     } else if (set_state == C_RCV) {
       if (recv_set == DELIMETER)
         set_state = FLAG_RCV;
-      else if (recv_set == (A_SENDER ^ C_SET))
+      else if (recv_set == (address_byte ^ control_byte))
         set_state = BCC_RCV;
       else
         set_state = START_RCV;
     } else if (set_state == BCC_RCV) {
+      printf("What the actual fuck: %d", recv_set == DELIMETER);
       if (recv_set == DELIMETER)
         stop = TRUE;
       else
@@ -102,7 +102,7 @@ void recv_ua_state_machine() {
 
       ua_state = START_RCV;
       resend = false;
-      if (send_supervised_set() != 0)
+      if (send_supervised_frame(A_SENDER, C_SET) != 0)
         return;
     }
 
@@ -158,7 +158,7 @@ int llopen(LinkLayer connectionParameters) {
   setup_port(fd);
 
   if (connectionParameters.role == LlRx) {
-    recv_set_state_machine();
+    recv_supervision_state_machine(A_SENDER, C_SET);
 
     unsigned char ua[SETUP_COMM_MSG_SIZE] = {DELIMETER, A_RECEIVER, C_UA,
                                              A_RECEIVER ^ C_UA, DELIMETER};
@@ -167,7 +167,7 @@ int llopen(LinkLayer connectionParameters) {
     (void)signal(SIGALRM, resend_timer);
 
     alarm(connectionParameters.timeout);
-    if (send_supervised_set() != 0)
+    if (send_supervised_frame(A_SENDER, C_SET) != 0)
       return -1;
     recv_ua_state_machine();
   } else {
@@ -443,11 +443,57 @@ int llread(unsigned char *packet) {
   return 0;
 }
 
+int llclose_transmitter() {
+  printf("Llcose transmitter\n");
+  if (send_supervised_frame(A_SENDER, DISC) == -1) {
+    return -1;
+  }
+
+  printf("Wrote DISC\n");
+
+  recv_supervision_state_machine(A_RECEIVER, DISC);
+
+  printf("Received disc from receiver\n");
+
+  if (send_supervised_frame(A_SENDER, C_UA) == -1) {
+    return -1;
+  }
+
+  close(fd);
+  printf("closed!\n");
+}
+
+int llclose_receiver() {
+  unsigned char buf;
+  int stop = 0;
+
+  recv_supervision_state_machine(A_SENDER, DISC);
+
+  printf("receved disc\n");
+
+  if (send_supervised_frame(A_RECEIVER, DISC) == -1) {
+    return -1;
+  }
+
+  recv_supervision_state_machine(A_SENDER, C_UA);
+
+  close(fd);
+  printf("closed\n");
+}
+
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-int llclose(int showStatistics) {
-  // TODO
+int llclose(LinkLayerRole role, int showStatistics) {
+  if (role == LlTx) {
+    if (llclose_transmitter() == -1) {
+      return -1;
+    }
+  } else {
+    if (llclose_receiver() == -1) {
+      return -1;
+    }
+  }
 
-  return 1;
+  return 0;
 }

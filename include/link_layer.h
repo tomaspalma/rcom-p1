@@ -7,6 +7,7 @@
 #define DELIMETER 0x7E
 #define A_SENDER 0x03
 #define A_RECEIVER 0x01
+#define DISC 0xB
 #define C_SET 0x03
 #define C_UA 0x07
 #define C_NUMBER0 0x00
@@ -24,6 +25,8 @@
 #define ESCAPE 0x7D
 #define ESCAPED_DELIMITER 0x5e
 #define ESCAPED_ESCAPE 0x5d
+
+#define SUPERVISION_FRAME_SIZE 5
 
 #define MAX_DATAFIELD_SIZE 1024
 
@@ -63,6 +66,9 @@ int llread(unsigned char *packet);
 // Close previously opened connection.
 // if showStatistics == TRUE, link layer should print statistics in the console
 // on close. Return "1" on success or "-1" on error.
-int llclose(int showStatistics);
+int llclose(LinkLayerRole role, int showStatistics);
+
+int llclose_transmitter();
+int llclose_receiver();
 
 #endif // _LINK_LAYER_H_
