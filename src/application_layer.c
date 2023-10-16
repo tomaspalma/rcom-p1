@@ -73,7 +73,7 @@ unsigned char *read_control_frame(int app_layer_control, int *file_size) {
   return filename;
 }
 
-int read_file(int file_size, unsigned char *filename) {
+int read_file(int file_size, unsigned char *filename, FILE *file, int *current_size) {
   if (filename == NULL) {
     printf("Filename cannot be null\n");
     return -1;
@@ -97,11 +97,14 @@ int read_file(int file_size, unsigned char *filename) {
 
   int l2 = buf[1];
   int l1 = buf[2];
-  int k = 256 * l2 + l1;
+  *current_size += 256 * l2 + l1;
 
-  FILE *file = fopen("penguin_received.gif", "a");
-  char * str = &buf[3];
+  char *str = &buf[3];
   fputs(str, file);
+
+  if (get_size_of_file(file) != *current_size) {
+    printf("Number of bytes supposed to have been received is different than the number of bytes that was actually received");
+  }
 
   return 0;
 }
@@ -116,7 +119,9 @@ int receiver_application_layer() {
     return -1;
   }
 
-  if (read_file(file_size_start, filename) == -1) {
+  int current_size = 0;
+  FILE *file = fopen("penguin_received.gif", "a");
+  if (read_file(file_size_start, filename, file, &current_size) == -1) {
     return -1;
   }
 
