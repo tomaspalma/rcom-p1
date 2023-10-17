@@ -10,23 +10,11 @@
 #include "link_layer.h"
 #include "utils.h"
 
-extern int fd;
-
 unsigned char *read_control_frame(int app_layer_control, int *file_size) {
   if (*file_size != 0) {
     printf("Initial value of file size needs to be 0\n");
     return NULL;
   }
-
-  // unsigned char buf = 0;
-  unsigned char *filename = NULL;
-
-  int stop = 0;
-
-  int t = INVALID;
-  int l = INVALID;
-  int length_read = 0;
-  int v_left_to_read = 0;
 
   unsigned char buf[BUFSIZ];
 
@@ -39,8 +27,13 @@ unsigned char *read_control_frame(int app_layer_control, int *file_size) {
     return NULL;
   }
 
-  READ_CONTROL_STATE state = READ_FILESIZE;
+  // unsigned char buf = 0;
+  unsigned char *filename = NULL;
+
+  int l = INVALID;
+  int stop = 0;
   int index = 1;
+  READ_CONTROL_STATE state = READ_FILESIZE;
   while (!stop) {
     if (buf[index] == 0 && state == READ_FILESIZE) {
       index++;
@@ -80,40 +73,37 @@ unsigned char *read_control_frame(int app_layer_control, int *file_size) {
   return filename;
 }
 
-int read_file(int file_size, unsigned char *filename) {
+int read_file(int file_size, unsigned char *filename, FILE *file, int *current_size) {
   if (filename == NULL) {
     printf("Filename cannot be null\n");
     return -1;
   }
 
-  unsigned char buf = 0;
+  unsigned char buf[BUFSIZ];
+
+  if (llread(&buf) == 0) {
+    return NULL;
+  }
+
   int bytes_read = 0;
   READ_FILE_STATE read_state = CONTROL_DATA;
 
-  int l2 = 0;
-  int l1 = 0;
   int packet_size = 0;
-  int k = 0;
 
-  int stop = 0;
-  while (!stop) {
-    read(fd, &buf, 1);
+  if (buf[0] != CONTROL_DATA) {
+    printf("App layer data control field wrong");
+    return -1;
+  }
 
-    if (read_state == READ_CONTROL_DATA) {
-      if (buf == CONTROL_DATA) {
-        read_state = READ_DATA_L2;
-      }
-    } else if (read_state == READ_DATA_L2) {
-      l2 = buf;
-      read_state = READ_DATA_L1;
-    } else if (read_state == READ_DATA_L1) {
-      l1 = buf;
+  int l2 = buf[1];
+  int l1 = buf[2];
+  *current_size += 256 * l2 + l1;
 
-      packet_size |= ((l2 << 8) | l1);
-      k = 256 * l2 + l1;
-      read_state = READ_DATA;
-    } else if (read_state == READ_DATA) {
-    }
+  char *str = &buf[3];
+  fputs(str, file);
+
+  if (get_size_of_file(file) != *current_size) {
+    printf("Number of bytes supposed to have been received is different than the number of bytes that was actually received");
   }
 
   return 0;
@@ -129,7 +119,9 @@ int receiver_application_layer() {
     return -1;
   }
 
-  if (read_file(file_size_start, filename) == -1) {
+  int current_size = 0;
+  FILE *file = fopen("penguin_received.gif", "a");
+  if (read_file(file_size_start, filename, file, &current_size) == -1) {
     return -1;
   }
 
