@@ -41,9 +41,10 @@ int transmitter_application_layer(const char *filename);
 int receiver_application_layer();
 
 unsigned char *read_control_frame(int app_layer_control, int *file_size);
-int read_file(int file_size, unsigned char *filename, FILE *file, int *current_size);
+int read_file(int file_size, unsigned char *filename, FILE *file,
+              int *current_size);
 
-int send_file(FILE *file);
+int send_file(FILE *file, int file_size);
 
 int send_control_frame(const char *filename, int file_size,
                        int app_layer_control);

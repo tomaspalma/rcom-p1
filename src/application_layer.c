@@ -73,7 +73,8 @@ unsigned char *read_control_frame(int app_layer_control, int *file_size) {
   return filename;
 }
 
-int read_file(int file_size, unsigned char *filename, FILE *file, int *current_size) {
+int read_file(int file_size, unsigned char *filename, FILE *file,
+              int *current_size) {
   if (filename == NULL) {
     printf("Filename cannot be null\n");
     return -1;
@@ -81,30 +82,99 @@ int read_file(int file_size, unsigned char *filename, FILE *file, int *current_s
 
   unsigned char buf[BUFSIZ];
 
-  if (llread(&buf) == 0) {
-    return NULL;
-  }
+  int l1 = 0;
+  int l2 = 0;
 
+  printf("------------------------------\n", file_size);
+  printf("File size: %d\n", file_size);
+  printf("------------------------------\n");
+
+  int packets = 0;
+  int packet_size;
   int bytes_read = 0;
-  READ_FILE_STATE read_state = CONTROL_DATA;
+  int current_bytes_read;
+  while (bytes_read < file_size) {
+    llread(&buf);
 
-  int packet_size = 0;
+    l2 = buf[1];
+    l1 = buf[2];
+    packet_size = l2;
+    packet_size <<= 8;
+    packet_size |= l1;
 
-  if (buf[0] != CONTROL_DATA) {
-    printf("App layer data control field wrong");
-    return -1;
+    bytes_read += packet_size;
+
+    printf("Packet Size: %d\n", packet_size);
+
+    packets++;
+
+    printf("Before segmenetation    \n");
+    for (int i = 0; i < packet_size; i++) {
+      fputc(buf[3 + i], file);
+    }
+    printf("After segmenetation    \n");
   }
 
-  int l2 = buf[1];
-  int l1 = buf[2];
-  *current_size += 256 * l2 + l1;
+  // unsigned char buf[file_size];
+  // unsigned char file_buf[file_size + 1];
+  //
+  // int file_index = 0;
+  // int b = 0;
+  // int c;
+  // int debugy = 0;
+  // while (1) {
+  //   memset(buf, 0, file_size);
+  //   c = llread(&buf);
+  //   b += c;
+  //
+  //   printf("WHAT THE ACTUAL FUCK: %x\n", buf[0]);
+  //
+  //   printf("B is: %d\n", b);
+  //
+  //   if (buf[0] != CONTROL_DATA) {
+  //     printf("App layer data control field wrong");
+  //     return -1;
+  //   }
+  //
+  //   printf("We have read: %d\n", c);
+  //   // fputs(&buf[3], file);
+  //   printf("Foda-se: %d\n", strlen(buf + 3));
+  //   printf("Foda-se2: %d\n", c);
+  //   for (int i = 0; i < c; i++) {
+  //     printf("Reeived UWU: %c\n", buf[i + 3]);
+  //     fputc(buf[i + 3], file);
+  //   }
+  //   debugy += (c - 3);
+  //   // printf("File index: %d\n", file_index);
+  //   // strcpy(buf[3], file_buf + file_index);
+  //   // file_index += c;
+  //
+  //   if (c == 10968) {
+  //     printf("C is: %d\n", c);
+  //     printf("WE HARDOCODING BRO: %d\n", debugy);
+  //     break;
+  //   }
+  // }
+  //
+  // printf("Exited llread\n");
+  //
+  // READ_FILE_STATE read_state = CONTROL_DATA;
+  //
+  // int packet_size = 0;
 
-  char *str = &buf[3];
-  fputs(str, file);
+  // int l2 = buf[1];
+  // int l1 = buf[2];
+  // *current_size += 256 * l2 + l1;
+  //
+  // if (get_size_of_file(file) != *current_size) {
+  //   printf("Number of bytes supposed to have been received is different than
+  //   "
+  //          "the number of bytes that was actually received");
+  // }
 
-  if (get_size_of_file(file) != *current_size) {
-    printf("Number of bytes supposed to have been received is different than the number of bytes that was actually received");
-  }
+  printf("PACKETS READ WERE: %d\n", packets);
+
+  printf("Leaving read file!!!\n");
 
   return 0;
 }
@@ -120,10 +190,16 @@ int receiver_application_layer() {
   }
 
   int current_size = 0;
-  FILE *file = fopen("penguin_received.gif", "a");
+  FILE *file;
+  if ((file = fopen("penguin_received.gif", "w")) == NULL) {
+    printf("Failed to open file!");
+    return -1;
+  }
+  printf("Reading file: \n");
   if (read_file(file_size_start, filename, file, &current_size) == -1) {
     return -1;
   }
+  printf("Stopped reading file: \n");
 
   free(filename);
   filename = NULL;
@@ -134,25 +210,48 @@ int receiver_application_layer() {
   }
 }
 
-int send_file(FILE *file) {
+int send_file(FILE *file, int file_size) {
+  printf("Started trying to send file!\n");
   if (file == NULL) {
     printf("One or more of the arguments passed are NULL");
     return -1;
   }
 
+  int packets = 0;
   unsigned char packet[3 + MAX_DATAFIELD_SIZE];
   packet[0] = CONTROL_DATA;
   int bytes_read;
+  int total_read = 0;
 
   while ((bytes_read = fread(packet + 3, sizeof(unsigned char),
-                             MAX_DATAFIELD_SIZE, file)) > 0) {
-    printf("Bytes read: %d\n", bytes_read);
+                             MAX_DATAFIELD_SIZE, file)) >= MAX_DATAFIELD_SIZE) {
     packet[1] = (bytes_read & 0xff00) >> 8;
     packet[2] = bytes_read & 0xff;
-    if (llwrite(packet + 3, bytes_read) == -1) {
+    for (int i = 0; i < bytes_read; i++) {
+      printf("God help please :( %c\n", packet[3 + i]);
+      printf("Bytes read are: %d\n", bytes_read);
+      printf("Packet 0 is: %x\n", packet[0]);
+    }
+
+    if (llwrite(packet, bytes_read + 3) == -1) {
       return -1;
     }
+    total_read += bytes_read;
+    packets++;
   }
+
+  packet[1] = (bytes_read & 0xff00) >> 8;
+  packet[2] = bytes_read & 0xff;
+  if (llwrite(packet, bytes_read + 3) == -1) {
+    return -1;
+  }
+  packets++;
+
+  printf("<<<<<<<<<<>>>>>>>>>>>> Total read from file: %d\n",
+         total_read + bytes_read);
+
+  printf("Packets were: %d\n", packets);
+
   return 0;
 }
 
@@ -175,14 +274,10 @@ int send_control_frame(const char *filename, int file_size,
   control[1] = FILE_SIZE;
   control[2] = file_size_bytes;
 
-  printf("File size: %d\n", file_size);
-  printf("File size bytes: %d\n", file_size_bytes);
   for (int i = 0; i < file_size_bytes; i++) {
     control[3 + i] = (file_size & 0xff);
     file_size >>= 8;
   }
-
-  printf(":((((((((((()))))))))))\n");
 
   unsigned char index = file_size_bytes + 2 + 1;
   control[index] = FILE_NAME;
@@ -204,16 +299,16 @@ int transmitter_application_layer(const char *filename) {
     return -1;
   }
 
-  printf("A\n");
   int file_size = get_size_of_file(file);
-  printf("File size: %d\n", file_size);
   if (send_control_frame(filename, file_size, CONTROL_START) == -1) {
     return -1;
   }
 
-  if (send_file(file) == -1) {
+  printf("----------------------------- Sending file\n");
+  if (send_file(file, file_size) == -1) {
     return -1;
   }
+  printf("Stopped sending file---------------------------------------\n");
 
   if (send_control_frame(filename, file_size, CONTROL_END) == -1) {
     return -1;
@@ -255,19 +350,36 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
       printf("Transmitting application layer failed!\n");
       return -1;
     }
-    // unsigned char *msg = "hello";
-    // llwrite(msg, 5);
-    // llwrite(msg, 5);
+    // unsigned char msg[6] = {'h', 'e', 0x7d, 'l', 0x7e, 'o'};
+    // int bcc = 0;
+    // for (int i = 0; i < 6; i++) {
+    //   bcc ^= msg[i];
+    // }
+    // printf("Bcc should be: %d\n", bcc);
+    // llwrite(msg, 6);
+    // llwrite(msg, 6);
+    // llwrite(msg, 6);
+    // llwrite(msg, 6);
+    // llwrite(msg, 6);
   } else {
     if (receiver_application_layer() == -1) {
       printf("Receiving application layer failed!\n");
       return -1;
     }
-    // unsigned char msg[5];
+    // unsigned char msg[6];
     // llread(msg);
     // printf("%s\n", msg);
-    // unsigned char m[5];
+    // unsigned char m[6];
     // llread(m);
     // printf("%s\n", m);
+    // unsigned char s[6];
+    // llread(s);
+    // printf("%s\n", s);
+    // unsigned char a[6];
+    // llread(a);
+    // printf("%s\n", a);
+    // unsigned char b[6];
+    // llread(b);
+    // printf("%s\n", b);
   }
 }

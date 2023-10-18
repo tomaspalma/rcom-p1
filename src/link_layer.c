@@ -243,8 +243,6 @@ int stop_and_wait(unsigned char *frame, int size) {
 
     read(fd, &buf, 1);
 
-    printf("Current state is: %d\n", current_state);
-
     if (current_state == START_RCV) { // 0
       if (buf == DELIMETER)
         current_state = FLAG_RCV;
@@ -313,6 +311,9 @@ int stop_and_wait(unsigned char *frame, int size) {
  * @param bufSize Number of bytes of data
  * @return int
  */
+
+int s = 0;
+
 int llwrite(const unsigned char *buf, int bufSize) {
   unsigned char *frame = (unsigned char *)malloc(HEADER_START_SIZE +
                                                  bufSize * 2 + HEADER_END_SIZE);
@@ -321,14 +322,11 @@ int llwrite(const unsigned char *buf, int bufSize) {
   unsigned char bcc2 = 0;
   int byte_stuffing_offset = 0;
   int frame_index = HEADER_START_SIZE - 1;
-  printf("Buf size is: %d\n", bufSize);
   for (int i = 0; i < bufSize; i++) {
     if (buf[i] == DELIMETER) {
-      printf("UIHFSDUHGFDSU\n");
       frame[++frame_index] = ESCAPE;
       frame[++frame_index] = ESCAPED_DELIMITER;
     } else if (buf[i] == ESCAPE) {
-      printf("UIHFSDUHGFDSU\n");
       frame[++frame_index] = ESCAPE;
       frame[++frame_index] = ESCAPED_ESCAPE;
     } else {
@@ -340,22 +338,9 @@ int llwrite(const unsigned char *buf, int bufSize) {
     bcc2 ^= buf[i];
   }
 
-  printf("Frame index ended up at: %d\n", frame_index);
-  printf("Frame value ended up at: %x\n", frame[frame_index]);
-  printf("Frame value ended up at: %x\n", frame[frame_index - 1]);
-  printf("Frame value ended up at: %x\n", frame[frame_index - 2]);
-
-  printf("Bcc will be %d\n", bcc2);
-
-  printf("Frame index is: %d\n", frame_index);
-
-  printf("Bcc is: %d\n", bcc2);
-
   assemble_end_frame(frame_index + 1, frame, bcc2);
   frame_index += 2;
   printf("Please be delimeter uWu %x\n", frame[frame_index]);
-
-  printf("Sou tão horrível, minha nossa %x\n", frame[frame_index]);
 
   if (stop_and_wait(frame, frame_index + 1) == -1) {
     return -1;
@@ -377,9 +362,9 @@ int llread(unsigned char *packet) {
 
   int i = 0;
   while (!stop) {
-    printf("State: %d\n", read_state);
+    // printf("State: %d\n", read_state);
     read(fd, &byte, 1);
-    printf("Looping\n");
+    // printf("Looping\n");
 
     int cancel = 0;
 
@@ -412,7 +397,6 @@ int llread(unsigned char *packet) {
       else
         read_state = START;
     } else if (read_state == READ_DATA) {
-      printf("Foda-se meu: %x\n", byte);
       if (byte == ESCAPE)
         read_state = ESC_RCV;
       else if (byte == DELIMETER) {
@@ -439,6 +423,8 @@ int llread(unsigned char *packet) {
           write(fd, acceptance_frame, 5);
           nr = (nr + 1) % 2;
           ns = (ns + 1) % 2;
+
+          printf("I is: %d\n", i);
           return i;
         } else if (recv_bcc2 != calc_bcc2) {
           unsigned char rejection_frame[5] = {DELIMETER, A_RECEIVER, C_REJ(nr),
