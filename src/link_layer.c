@@ -26,6 +26,7 @@ int ns = 0;
 int nr = 1;
 
 void resend_timer(int signal) {
+  fprintf("Hello", stdout);
   resend = TRUE;
   send_tries++;
   alarm(TIMEOUT);
@@ -50,7 +51,7 @@ void recv_supervision_state_machine(unsigned char address_byte,
   unsigned char recv_set = 0;
   unsigned char stop = FALSE;
   while (stop == FALSE) {
-    read(fd, &recv_set, 1);
+    while(read(fd, &recv_set, 1) == 0);
 
     printf("Received: %x\n", recv_set);
 
@@ -106,7 +107,7 @@ void recv_ua_state_machine() {
         return;
     }
 
-    read(fd, &recv_ua, 1);
+    while(read(fd, &recv_ua, 1) == 0);
 
     // printf("Received: %x\n", recv_ua);
 
@@ -152,8 +153,10 @@ void recv_ua_state_machine() {
 ////////////////////////////////////////////////
 int llopen(LinkLayer connectionParameters) {
   fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY);
-  if (fd == -1)
+  if (fd == -1) {
+    printf("Fd\n");
     return -1;
+  }
 
   setup_port(fd);
 
@@ -165,7 +168,7 @@ int llopen(LinkLayer connectionParameters) {
     write(fd, ua, SETUP_COMM_MSG_SIZE);
   } else if (connectionParameters.role == LlTx) {
     (void)signal(SIGALRM, resend_timer);
-
+    printf("Started\n");
     alarm(connectionParameters.timeout);
     if (send_supervised_frame(A_SENDER, C_SET) != 0)
       return -1;
@@ -204,11 +207,14 @@ int assemble_end_frame(int offset, unsigned char *frame, unsigned char bcc2) {
 }
 
 int stop_and_wait(unsigned char *frame, int size) {
+  (void)signal(SIGALRM, resend_timer);
   alarm(TIMEOUT);
   int ntries = 0;
   bool received = FALSE;
   send_tries = 0;
   resend = FALSE;
+
+  int goback = false;
 
   // for (int i = 0; i < size; i++) {
   //   printf("Sent: %x\n", frame[i]);
@@ -228,20 +234,36 @@ int stop_and_wait(unsigned char *frame, int size) {
   unsigned char buf = 0;
   unsigned char confirmation_byte = 0;
   while (!received) {
+    printf("RESEND: %d\n", resend);
     if (resend) {
-      if (send_tries >= N_TRIES) {
+      printf("Send tries is: %d\n", send_tries);
+      if (send_tries > N_TRIES) {
+        printf("Send tries excedded\n");
         return -1;
       }
 
+      alarm(TIMEOUT);
       current_state = START_RCV;
       resend = false;
+      goback = false;
       if (write(fd, frame, size) == -1) {
         printf("Error writing frame in the link layer!");
         return -1;
       }
+      printf("Wrote frame again!\n");
     }
 
-    read(fd, &buf, 1);
+    printf("Reading: \n");
+    while(read(fd, &buf, 1) == 0) {
+      if(resend == true)  {
+        goback = true;
+        break;
+      }
+    }
+    if(goback) continue;
+    printf("Stopped reading\n");
+
+    printf("Byte: %d\n", buf);
 
     if (current_state == START_RCV) { // 0
       if (buf == DELIMETER)
@@ -285,6 +307,8 @@ int stop_and_wait(unsigned char *frame, int size) {
             current_state = START_RCV;
             resend = false;
           }
+
+          printf("CONFIRMATION BYTE?\n");
 
           alarm(0);
           received = TRUE;
@@ -363,7 +387,7 @@ int llread(unsigned char *packet) {
   int i = 0;
   while (!stop) {
     // printf("State: %d\n", read_state);
-    read(fd, &byte, 1);
+    while(read(fd, &byte, 1) == 0);
     // printf("Looping\n");
 
     int cancel = 0;

@@ -24,8 +24,8 @@ int setup_port(int fd) {
     newtio.c_oflag = 0;
 
     newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = 3;
-    newtio.c_cc[VMIN] = 5;
+    newtio.c_cc[VTIME] = 0;
+    newtio.c_cc[VMIN] = 0;
 
     tcflush(fd, TCIOFLUSH);
 
