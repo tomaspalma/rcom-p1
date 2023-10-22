@@ -382,4 +382,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     // llread(b);
     // printf("%s\n", b);
   }
+
+  if (llclose(conn_params.role, 1) == -1) {
+    printf("Failed to restore previous configuration on serial port\n");
+    return;
+  }
 }

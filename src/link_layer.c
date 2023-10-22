@@ -15,6 +15,8 @@
 #include "link_layer.h"
 #include "serial_port.h"
 
+extern struct termios oldtio;
+
 enum OPEN_STATES { START_RCV, FLAG_RCV, A_RCV, C_RCV, BCC_RCV };
 
 enum READ_STATES { START, READ_FLAG, READ_A, READ_C, READ_DATA, ESC_RCV };
@@ -357,7 +359,7 @@ int stop_and_wait(unsigned char *frame, int size) {
 int s = 0;
 
 int llwrite(const unsigned char *buf, int bufSize) {
-  sleep(2);
+  // sleep(2);
   unsigned char *frame = (unsigned char *)malloc(HEADER_START_SIZE +
                                                  bufSize * 2 + HEADER_END_SIZE);
   assemble_start_frame(frame);
@@ -536,7 +538,6 @@ int llclose_transmitter() {
     return -1;
   }
 
-  close(fd);
   printf("closed!\n");
 }
 
@@ -554,7 +555,6 @@ int llclose_receiver() {
 
   recv_supervision_state_machine(A_SENDER, C_UA);
 
-  close(fd);
   printf("closed\n");
 }
 
@@ -571,6 +571,13 @@ int llclose(LinkLayerRole role, int showStatistics) {
       return -1;
     }
   }
+
+  if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
+    perror("tcsetattr");
+    exit(-1);
+  }
+
+  close(fd);
 
   return 0;
 }
