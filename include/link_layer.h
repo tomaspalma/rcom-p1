@@ -68,6 +68,8 @@ int llread(unsigned char *packet);
 // on close. Return "1" on success or "-1" on error.
 int llclose(LinkLayerRole role, int showStatistics);
 
+int show_statistics(LinkLayerRole role);
+
 int llclose_transmitter();
 int llclose_receiver();
 

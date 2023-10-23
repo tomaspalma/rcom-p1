@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "link_layer.h"
@@ -20,6 +21,12 @@ extern struct termios oldtio;
 enum OPEN_STATES { START_RCV, FLAG_RCV, A_RCV, C_RCV, BCC_RCV };
 
 enum READ_STATES { START, READ_FLAG, READ_A, READ_C, READ_DATA, ESC_RCV };
+
+int transfered_file_size = 0;
+int number_of_sender_retries = 0;
+int number_of_errors_detected = 0;
+clock_t start_time;
+clock_t end_time;
 
 int fd;
 bool resend = FALSE;
@@ -253,6 +260,8 @@ int stop_and_wait(unsigned char *frame, int size) {
         printf("Send tries excedded\n");
         return -1;
       }
+
+      number_of_sender_retries++;
 
       alarm(TIMEOUT);
       current_state = START_RCV;
@@ -494,6 +503,8 @@ int llread(unsigned char *packet) {
                                               A_RECEIVER & C_REJ(nr),
                                               DELIMETER};
 
+          number_of_errors_detected++;
+
           printf("Rejection!");
 
           write(fd, rejection_frame, 5);
@@ -558,6 +569,28 @@ int llclose_receiver() {
   printf("closed\n");
 }
 
+int show_statistics(LinkLayerRole role) {
+  /*
+   *
+* number_of_sender_retries = 0;
+int number_of_errors_detected = 0;
+int start_time = 0;
+   * */
+
+  printf("------------------\n");
+  printf("STATISTICS:\n");
+  printf("Size of file in bytes: %d\n", transfered_file_size);
+  if (role == LlTx) {
+    printf("Number of sender retries: %d\n", number_of_sender_retries);
+  }
+  if (role == LlRx) {
+    printf("Number of errors detected %d\n", number_of_errors_detected);
+  }
+  printf("Time taken was: %f\n",
+         ((double)(end_time - start_time)) / CLOCKS_PER_SEC);
+  printf("------------------\n");
+}
+
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
@@ -570,6 +603,10 @@ int llclose(LinkLayerRole role, int showStatistics) {
     if (llclose_receiver() == -1) {
       return -1;
     }
+  }
+
+  if (showStatistics) {
+    show_statistics(role);
   }
 
   if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {

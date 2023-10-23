@@ -10,6 +10,10 @@
 #include "link_layer.h"
 #include "utils.h"
 
+extern clock_t start_time;
+extern clock_t end_time;
+extern int transfered_file_size;
+
 unsigned char *read_control_frame(int app_layer_control, int *file_size) {
   if (*file_size != 0) {
     printf("Initial value of file size needs to be 0\n");
@@ -208,6 +212,8 @@ int receiver_application_layer() {
     printf("");
     return -1;
   }
+
+  transfered_file_size = file_size_stop;
 }
 
 int send_file(FILE *file, int file_size) {
@@ -251,6 +257,8 @@ int send_file(FILE *file, int file_size) {
          total_read + bytes_read);
 
   printf("Packets were: %d\n", packets);
+
+  transfered_file_size = file_size;
 
   return 0;
 }
@@ -346,10 +354,12 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
   }
 
   if (conn_params.role == LlTx) {
+    start_time = clock();
     if (transmitter_application_layer(filename) == -1) {
       printf("Transmitting application layer failed!\n");
       return -1;
     }
+    end_time = clock();
     // unsigned char msg[6] = {'h', 'e', 0x7d, 'l', 0x7e, 'o'};
     // int bcc = 0;
     // for (int i = 0; i < 6; i++) {
@@ -362,10 +372,12 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     // llwrite(msg, 6);
     // llwrite(msg, 6);
   } else {
+    start_time = clock();
     if (receiver_application_layer() == -1) {
       printf("Receiving application layer failed!\n");
       return -1;
     }
+    end_time = clock();
     // unsigned char msg[6];
     // llread(msg);
     // printf("%s\n", msg);
