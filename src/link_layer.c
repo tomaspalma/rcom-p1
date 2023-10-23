@@ -230,7 +230,6 @@ int assemble_end_frame(int offset, unsigned char *frame, unsigned char bcc2) {
 int stop_and_wait(unsigned char *frame, int size) {
   (void)signal(SIGALRM, resend_timer);
   alarm(TIMEOUT);
-  int ntries = 0;
   bool received = FALSE;
   send_tries = 0;
   resend = FALSE;
@@ -245,7 +244,6 @@ int stop_and_wait(unsigned char *frame, int size) {
     perror(strerror(errno));
     return -1;
   }
-
   printf("Wrote frame\n");
 
   bool cancel = 0;
@@ -275,7 +273,7 @@ int stop_and_wait(unsigned char *frame, int size) {
         printf("0x%x\n", frame[i]);
       }
       printf("----\n");
-      printf("Wrote frame again!\n");
+      printf("Wrote frame again!");
     }
 
     printf("Reading: \n");
@@ -329,6 +327,7 @@ int stop_and_wait(unsigned char *frame, int size) {
         send_tries = 0;
 
         if (confirmation_byte == C_RR(1) || confirmation_byte == C_RR(0)) {
+          send_tries = 0;
           if (confirmation_byte != C_RR(nr)) {
             current_state = START_RCV;
             resend = false;
@@ -414,12 +413,11 @@ int llread(unsigned char *packet) {
 
   // enum READ_STATES { START, READ_FLAG, READ_A, READ_C, READ_DATA, ESC_RCV };
 
-  int fds = 0;
   int i = 0;
   while (!stop) {
     while (read(fd, &byte, 1) == 0) {
     };
-    printf("Received: 0x%x\n and state is %d", byte, read_state);
+    // printf("Received: 0x%x\n and state is %d", byte, read_state);
     // if (byte == DELIMETER) {
     //   printf("Received delimiter and state is :%d\n", read_state);
     // } else {
@@ -427,6 +425,9 @@ int llread(unsigned char *packet) {
     // }
 
     int cancel = 0;
+
+    // fds++;
+    // printf("Dor is :%d\n", fds);
 
     if (read_state == START) {
       // printf("Entered START\n");
@@ -486,7 +487,7 @@ int llread(unsigned char *packet) {
 
         if (recv_bcc2 == calc_bcc2) {
           stop = TRUE;
-          printf("A receiver: %d\n", A_RECEIVER);
+          // printf("A receiver: %d\n", A_RECEIVER);
           unsigned char acceptance_frame[5] = {DELIMETER, A_RECEIVER, C_RR(nr),
                                                A_RECEIVER ^ C_RR(nr),
                                                DELIMETER};
@@ -495,8 +496,7 @@ int llread(unsigned char *packet) {
           nr = (nr + 1) % 2;
           ns = (ns + 1) % 2;
 
-          printf("I is: %d\n", i);
-          fds++;
+          // printf("I is: %d\n", i);
           return i;
         } else if (recv_bcc2 != calc_bcc2) {
           unsigned char rejection_frame[5] = {DELIMETER, A_RECEIVER, C_REJ(nr),
@@ -508,8 +508,9 @@ int llread(unsigned char *packet) {
           printf("Rejection!");
 
           write(fd, rejection_frame, 5);
-          fds++;
           read_state = START;
+          i = 0;
+          continue;
         }
       } else if (!cancel) {
         packet[i] = byte;
