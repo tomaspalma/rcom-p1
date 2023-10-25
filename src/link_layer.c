@@ -27,6 +27,8 @@ int number_of_sender_retries = 0;
 int number_of_errors_detected = 0;
 clock_t start_time;
 clock_t end_time;
+int total_frames = 0;
+int total_bytes = 0;
 
 int fd;
 bool resend = FALSE;
@@ -36,7 +38,6 @@ int ns = 0;
 int nr = 1;
 
 void resend_timer(int signal) {
-  fprintf("Hello", stdout);
   resend = TRUE;
   send_tries++;
   alarm(TIMEOUT);
@@ -244,6 +245,8 @@ int stop_and_wait(unsigned char *frame, int size) {
     perror(strerror(errno));
     return -1;
   }
+  total_bytes += size;
+  total_frames++;
   printf("Wrote frame\n");
 
   bool cancel = 0;
@@ -268,15 +271,10 @@ int stop_and_wait(unsigned char *frame, int size) {
         printf("Error writing frame in the link layer!");
         return -1;
       }
-      printf("----\n");
-      for (int i = 0; i < size; i++) {
-        printf("0x%x\n", frame[i]);
-      }
-      printf("----\n");
-      printf("Wrote frame again!");
+      total_bytes += size;
+      // total_frames++;
     }
 
-    printf("Reading: \n");
     while (read(fd, &buf, 1) == 0) {
       if (resend == true) {
         goback = true;
@@ -287,7 +285,8 @@ int stop_and_wait(unsigned char *frame, int size) {
       goback = false;
       continue;
     }
-    printf("Read Byte: %d\n", buf);
+
+    printf("Current state is: %d\n", current_state);
 
     if (current_state == START_RCV) { // 0
       if (buf == DELIMETER)
@@ -309,14 +308,12 @@ int stop_and_wait(unsigned char *frame, int size) {
       } else
         current_state = START_RCV;
     } else if (current_state == C_RCV) {
-      printf("Buf is: %d\n", buf);
       if (buf == DELIMETER)
         current_state = FLAG_RCV;
       else if (buf == (A_RECEIVER ^ C_RR(nr)) ||
                buf == (A_RECEIVER ^ C_REJ(nr))) {
         current_state = BCC_RCV;
       } else {
-        printf("Está a entrar aqui???\n");
         current_state = START_RCV;
       }
     } else if (current_state == BCC_RCV) {
@@ -325,6 +322,8 @@ int stop_and_wait(unsigned char *frame, int size) {
       // }
       if (buf == DELIMETER) {
         send_tries = 0;
+
+        printf("Confirmation byte is %x\n", confirmation_byte);
 
         if (confirmation_byte == C_RR(1) || confirmation_byte == C_RR(0)) {
           send_tries = 0;
@@ -344,6 +343,8 @@ int stop_and_wait(unsigned char *frame, int size) {
         } else if (confirmation_byte == C_REJ(0) ||
                    confirmation_byte == C_REJ(1)) {
           resend = true;
+          sleep(2);
+          number_of_errors_detected++;
           printf("REJECTION!\n");
           alarm(TIMEOUT);
         }
@@ -367,7 +368,7 @@ int stop_and_wait(unsigned char *frame, int size) {
 int s = 0;
 
 int llwrite(const unsigned char *buf, int bufSize) {
-  // sleep(2);
+  sleep(2);
   unsigned char *frame = (unsigned char *)malloc(HEADER_START_SIZE +
                                                  bufSize * 2 + HEADER_END_SIZE);
   assemble_start_frame(frame);
@@ -386,14 +387,11 @@ int llwrite(const unsigned char *buf, int bufSize) {
       frame[++frame_index] = buf[i];
     }
 
-    // printf("Foda-se: %x\n", buf[i]);
-
     bcc2 ^= buf[i];
   }
 
   assemble_end_frame(frame_index + 1, frame, bcc2);
   frame_index += 2;
-  printf("Please be delimeter uWu %x\n", frame[frame_index]);
 
   if (stop_and_wait(frame, frame_index + 1) == -1) {
     return -1;
@@ -417,6 +415,7 @@ int llread(unsigned char *packet) {
   while (!stop) {
     while (read(fd, &byte, 1) == 0) {
     };
+    total_bytes++;
     // printf("Received: 0x%x\n and state is %d", byte, read_state);
     // if (byte == DELIMETER) {
     //   printf("Received delimiter and state is :%d\n", read_state);
@@ -458,7 +457,6 @@ int llread(unsigned char *packet) {
       else
         read_state = START;
     } else if (read_state == READ_C) {
-      // printf("Entered READ_C\n");
       if (byte == (A_SENDER ^ frame_number))
         read_state = READ_DATA;
       else if (byte == DELIMETER)
@@ -466,7 +464,6 @@ int llread(unsigned char *packet) {
       else
         read_state = START;
     } else if (read_state == READ_DATA) {
-      // printf("Entered READ_DATA\n");
       if (byte == ESCAPE)
         read_state = ESC_RCV;
       else if (byte == DELIMETER) {
@@ -482,8 +479,12 @@ int llread(unsigned char *packet) {
           calc_bcc2 ^= packet[j];
         }
 
+        total_frames++;
+
         printf("Recv  bcc is: %d\n", recv_bcc2);
         printf("Calc  bcc is: %d\n", calc_bcc2);
+
+        printf("NR: %d\n", nr);
 
         if (recv_bcc2 == calc_bcc2) {
           stop = TRUE;
@@ -500,7 +501,7 @@ int llread(unsigned char *packet) {
           return i;
         } else if (recv_bcc2 != calc_bcc2) {
           unsigned char rejection_frame[5] = {DELIMETER, A_RECEIVER, C_REJ(nr),
-                                              A_RECEIVER & C_REJ(nr),
+                                              A_RECEIVER ^ C_REJ(nr),
                                               DELIMETER};
 
           number_of_errors_detected++;
@@ -522,10 +523,6 @@ int llread(unsigned char *packet) {
         packet[i++] = DELIMETER;
       else if (byte == ESCAPED_ESCAPE)
         packet[i++] = ESCAPE;
-      // else {
-      //   packet[i++] = ESCAPE;
-      //   packet[i++] = byte;
-      // }
     }
 
     cancel = 0;
@@ -584,10 +581,13 @@ int start_time = 0;
   if (role == LlTx) {
     printf("Number of sender retries: %d\n", number_of_sender_retries);
   }
-  if (role == LlRx) {
-    printf("Number of errors detected %d\n", number_of_errors_detected);
-  }
-  printf("Time taken was: %f\n",
+  printf("Number of errors detected %d\n", number_of_errors_detected);
+  printf("Total frames: %d\n", total_frames);
+  printf("Frame Error Ratio is: %f\%\n",
+         (number_of_errors_detected / (double)total_frames) * 100);
+  double time_taken = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
+  printf("Bitrate is: %f\n", (total_bytes * 8) / time_taken);
+  printf("Time taken was: %f seconds\n",
          ((double)(end_time - start_time)) / CLOCKS_PER_SEC);
   printf("------------------\n");
 }

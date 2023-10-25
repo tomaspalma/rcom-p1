@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "application_layer.h"
@@ -13,6 +14,8 @@
 extern clock_t start_time;
 extern clock_t end_time;
 extern int transfered_file_size;
+extern int total_frames;
+extern int total_bytes;
 
 unsigned char *read_control_frame(int app_layer_control, int *file_size) {
   if (*file_size != 0) {
@@ -233,11 +236,11 @@ int send_file(FILE *file, int file_size) {
                              MAX_DATAFIELD_SIZE, file)) >= MAX_DATAFIELD_SIZE) {
     packet[1] = (bytes_read & 0xff00) >> 8;
     packet[2] = bytes_read & 0xff;
-    for (int i = 0; i < bytes_read; i++) {
-      printf("God help please :( %c\n", packet[3 + i]);
-      printf("Bytes read are: %d\n", bytes_read);
-      printf("Packet 0 is: %x\n", packet[0]);
-    }
+    // for (int i = 0; i < bytes_read; i++) {
+    //   printf("God help please :( %c\n", packet[3 + i]);
+    //   printf("Bytes read are: %d\n", bytes_read);
+    //   printf("Packet 0 is: %x\n", packet[0]);
+    // }
 
     if (llwrite(packet, bytes_read + 3) == -1) {
       return -1;
