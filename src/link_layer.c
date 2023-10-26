@@ -321,8 +321,6 @@ int stop_and_wait(unsigned char *frame, int size) {
       // current_state = START_RCV;
       // }
       if (buf == DELIMETER) {
-        send_tries = 0;
-
         printf("Confirmation byte is %x\n", confirmation_byte);
 
         if (confirmation_byte == C_RR(1) || confirmation_byte == C_RR(0)) {
@@ -342,6 +340,7 @@ int stop_and_wait(unsigned char *frame, int size) {
           nr = (nr + 1) % 2;
         } else if (confirmation_byte == C_REJ(0) ||
                    confirmation_byte == C_REJ(1)) {
+          send_tries++;
           resend = true;
           sleep(2);
           number_of_errors_detected++;
@@ -467,10 +466,6 @@ int llread(unsigned char *packet) {
       if (byte == ESCAPE)
         read_state = ESC_RCV;
       else if (byte == DELIMETER) {
-        if (cancel) {
-          printf("Joined cancel culture\n");
-          continue;
-        }
         unsigned char recv_bcc2 = packet[i - 1];
         packet[--i] = 0;
 
