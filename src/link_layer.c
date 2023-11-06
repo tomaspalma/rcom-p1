@@ -342,7 +342,7 @@ int stop_and_wait(unsigned char *frame, int size) {
                    confirmation_byte == C_REJ(1)) {
           send_tries++;
           resend = true;
-          sleep(2);
+          // sleep(2);
           number_of_errors_detected++;
           printf("REJECTION!\n");
           alarm(TIMEOUT);
@@ -367,7 +367,7 @@ int stop_and_wait(unsigned char *frame, int size) {
 int s = 0;
 
 int llwrite(const unsigned char *buf, int bufSize) {
-  sleep(2);
+  // sleep(2);
   unsigned char *frame = (unsigned char *)malloc(HEADER_START_SIZE +
                                                  bufSize * 2 + HEADER_END_SIZE);
   assemble_start_frame(frame);
@@ -582,8 +582,7 @@ int start_time = 0;
          (number_of_errors_detected / (double)total_frames) * 100);
   double time_taken = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
   printf("Bitrate is: %f\n", (total_bytes * 8) / time_taken);
-  printf("Time taken was: %f seconds\n",
-         ((double)(end_time - start_time)) / CLOCKS_PER_SEC);
+  printf("Time taken was: %f seconds\n", time_taken);
   printf("------------------\n");
 }
 
