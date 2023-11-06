@@ -4,6 +4,7 @@ title: RCOM - 1º Projeto
 author:
 - Diogo Alexandre Soares Martins (202108883) 
 - Tomás Figueiredo Marques Palma (202108880)
+geometry: "left=2cm, right=2cm, top=1cm"
 ---
 
 # 1. Introdução
@@ -15,9 +16,7 @@ com conclusões sobre a eficiência e sobre o quão corretos os móduluos desenv
 
 No relatório, primeiramente ir-se-á encontrar documentado detalhes sobre
 a arquiterura, a estrutura do código e os casos de uso
-principais das camadas desenvolvidas.
-
-De seguida, falar-se-à com detalhe acerca de cada um dos protocolos
+principais das camadas desenvolvidas e de seguida falar-se-à com detalhe acerca de cada um dos protocolos
 desenvolvidos (o da ligação lógica e o da aplicação),
 sendo, depois, por fim, abordados a correção e a eficiência do programa.
 
@@ -49,18 +48,134 @@ num mesmo protocolo.
 
 ## 2.4. Módulo de *utils* (```utils.c```)
 
+### 2.4.1. Relação com a arquitetura
+
 Este módulo implementa uma API com funcionalidades fora da responsabilidade de outros módulos que em termos tal como
-teóricos poderiam ser usados em qualquer módulo, como
-a função para obter o tamanho de um ficheiro (```get_size_of_file```)
-e a de obter o número de bits de um determinado número de base 10 (```get_no_of_bits```).
+teóricos poderiam ser usados em qualquer módulo.
+
+### 2.4.2. Principais funções (API)
+
+```c
+int get_size_of_file(FILE *file);
+int get_no_of_bits(int n);
+```
 
 # 3. Estrutura do código
 
+## 3.1. Módulo porta série
+
+Este módulo é responsável pela configuração inicial da porta série.
+
+```c
+#define BAUDRATE 115200
+
+int setup_port(int fd);
+```
+
+## 3.2. Módulo da ligação de dados
+
+### 3.2.1. Relação com a arquitetura
+
+Este módulo é o responsável pela transmissão e receção de bytes de uma porta série, sem ter o conhecimento do que é que os bytes,
+para além dos de controlo especificados pelo guião do trabalho, significam.
+
+### 3.2.2. Principais funções (API)
+
+```c
+int llopen(LinkLayer connectionParameters);
+int llwrite(const unsigned char *buf, int bufSize);
+int llread(unsigned char *packet);
+int llclose(LinkLayerRole role, int showStatistics);
+int show_statistics(LinkLayerRole role);
+int llclose_transmitter();
+int llclose_receiver();
+```
+
+### 3.2.3. Principais estruturas de dados
+
+```c
+typedef enum {
+  LlTx,
+  LlRx,
+} LinkLayerRole;
+```
+
+- É utilizado como uma forma mais amigável ao programador de identificar se o programa está a ser executado como recetor
+ou transmissor.
+
+```c
+typedef struct {
+  char serialPort[50];
+  LinkLayerRole role;
+  int baudRate;
+  int nRetransmissions;
+  int timeout;
+} LinkLayer;
+```
+
+- É utilizado como um aglomerado de informação acerca da configuração de como o protocolo de ligação de dados irá funcionar e com que
+tipo de configuração da porta série.
+
+## 3.3. Módulo da aplicação
+
+### 3.3.1. Relação com a arquitetura
+
+É o módulo responsável pela funcionalidade de transmitir e receber ficheiros.
+
+### 3.3.2. Principais funções (API)
+
+```c
+void applicationLayer(const char *serialPort, const char *role, int baudRate,
+                      int nTries, int timeout, const char *filename);
+int transmitter_application_layer(const char *filename);
+int receiver_application_layer();
+unsigned char *read_control_frame(int app_layer_control, int *file_size);
+int read_file(int file_size, unsigned char *filename, 
+    FILE *file, int *current_size);
+int send_file(FILE *file, int file_size);
+int send_control_frame(const char *filename, int file_size, 
+    int app_layer_control);
+```
+
+### 3.3.3. Principais estruturas de dados
+
+Foram criadas as seguintes estruturas de dados auxiliares:
+
+```c
+typedef enum {
+  READ_CONTROL_START,
+  READ_FILESIZE,
+  READ_FILENAME,
+} READ_CONTROL_STATE;
+
+typedef enum {
+  READ_CONTROL_DATA,
+  READ_DATA_L1,
+  READ_DATA_L2,
+  READ_DATA
+} READ_FILE_STATE;
+```
+
+São estados utilizados na máquinas de estados de leitura do ficheiro.
+```c
+int get_size_of_file(FILE *file);
+int get_no_of_bits(int n);
+```
 # 4. Casos de usos principais
 
 Em cada um dos casos estará descrito o fluxo lógico de execução.
 
 ## 4.1. Receber um ficheiro
+
+A lógica inicia-se na função ```receiver_application_layer``` do ficheiro ```application_layer.c```.
+
+1. Receber a trama de conrole de início a partir da rotina ```read_control_frame(CONTROL_START, &file_size_start)``` que vai atribuir o tamanho do ficheiro e o nome do ficheiro a variáveis.
+
+2. Abrir of ficheiro onde se vai escrever com ```fopen```.
+
+3. Depois de recebida a trama de controlo inicial, vai-se recebendo tramas de informação com a função ```read_file```, até termos recebido o número de bytes igual ao indicado pela trama de controlo.
+
+4. Por fim, recebemos a trama de controlo de fim a partir da rotina ```read_control_frame(CONTROL_END, &file_size_stop)```.
 
 ## 4.2. Enviar um ficheiro
 
@@ -83,7 +198,45 @@ que a que a trama de controlo de início continha, a partir da rotina ```send_co
 
 # 5. Protocolo de ligação de dados
 
+Esta camada é a camada implementada por nós que é a de mais baixo nível, sendo ela a utilizada pelo protocolo de aplicação
+para transferir e receber ficheiros.
+
+## 5.1. ```llopen()```
+
+Uma das responsabilidades desta função é a preparação da porta série para transmissão e receção, configurando-a com os parâmetros pretendidos,
+sendo de seguida iniciado o processo de estabelecimento de comunicação entre as duas partes como descrito no guião do trabalho, em que o transmissor envia uma trama de supervisão ```SET``` e fica à espera de receber um ```UA``` do recetor,
+caso em que depois permite a execução da camada de aplicação.
+
+## 5.2. ``llwrite()``
+
+É responsável pela escrita de tramas de informação para a porta série recetora, processo no qual efetua um mecanismo de *byte stuffing*, caso
+existam bytes nos ficheiros a transferir que tenham significado para o protocolo de ligação de dados tal como é o caso do ```0x7e``` que indica
+o início e fim de uma trama, assim comocalcula o $bcc$ dos bytes enviados, não considerando
+os bytes adicionais resultantes do *byte stuffing*, colocando-os na trama de informação e, de seguida, fica à espera da resposta do recetor,
+retransmitindo a trama caso o recetor indique que detetou erro, ao calcular o bcc de novo.
+
+## 5.3. ``lread()``
+
+É responsável pela leitura de tramas de informação recebidas pelo transmissor, tendo de preoceder a um *destuffing* dos bytes, assim como
+verificando se o bcc calculado ao ler os bytes sem contar com os bytes adicionais do *stuffing* é igual ao que foi enviado pelo transmissor
+na trama de informação e, caso não seja, tem de enviar uma trama de supervisão de rejeição ```REJ(nr)``` para que o transmissor volte a reenviar. Caso cálculo do *bcc* bata certo, envia uma trama de supervisão de aceitação ```RR(nr)```.
+
+## 5.4. ``llclose()``
+
+É responsável pelo fecho da conexão, onde o transmissor envia um ```DISC``` para o recetor, ficando à espera de receber um ```DISC``` de volta
+do recetor, de seguida enviando um ```UA```, fechando a conexão. Por sua vez, o recetor apenas envia um ```DISC``` após receber o primeiro ```DISC``` do transmissor e depois fecha a conexão com a porta série.
+
 # 6. Protocolo de aplicação
+
+Esta camada é a camada de mais alto nível implementada por nós, sendo utilizada para interagir com o utilizador e com o ficheiro a ser transferido, utilizando a API do protocolo de ligação de dados.
+
+## 6.1. ```receiver_application_layer```
+
+É responsável por receber, primeiramente, a trama de controlo de início, que contém informacação sobre o nome e tamanho do ficheiro, seguida das tramas de informação, com as quais preenche um novo ficheiro (o ficheiro transferido), e, por fim, a trama de controlo de fim, que repete os dados transferidos na trama de controlo de início.
+
+## 6.2. ```transmitter_application_layer```
+
+É responsável por enviar o ficheiro desejado para o outro computador, começando pela trama de controlo de início, seguida das tramas de informação, que são geradas dividindo o ficheiro de modo que sejam o menor número possível de tramas, em que todas exceto a última têm tamamho ```MAX_DATAFIELD_SIZE```, e, por fim, a trama de controlo de fim.
 
 # 7. Validação
 
@@ -108,4 +261,20 @@ O programa também sucedeu com ficheiros de diferentes tamanhos:
 
 # 8. Eficiência do protocolo de ligação de dados
 
+## 8.1. Variar ```Frame Error Ratio``` 
+
+## 8.2. Variar tempo de propagação
+
+## 8.3. Variar capacidade de ligação
+
+## 8.4. Variar tamanho das tramas
+
 # 9. Conclusões
+
+Em suma, o nosso programa tem duas camadas principais, isoladas entre si em que a de ligação
+de dados expõe uma API para a camada da aplicação, de modo a que consigamos efetuar a transferência
+de um ficheiro de uma porta série para outra.
+
+Para além disso, em termos de aprendizagem, este trabalho foi bastante útil para uma melhor
+compreensão acerca de *byte stuffing*, assim como o mecanismo de transmissão e controlo de erros ```Stop and Wait```, tal como uma primeira experiência real com um dispositivo físico onde nem tudo funciona
+tão bem como num meio virtual.
