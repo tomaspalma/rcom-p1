@@ -5,7 +5,11 @@ author:
 - Diogo Alexandre Soares Martins (202108883) 
 - Tomás Figueiredo Marques Palma (202108880)
 geometry: "left=2cm, right=2cm, top=1cm"
+header-includes:
+    \usepackage{pgfplots}
+    \usepackage{pgfplotstable}
 ---
+
 
 # 1. Introdução
 
@@ -157,10 +161,12 @@ typedef enum {
 ```
 
 São estados utilizados na máquinas de estados de leitura do ficheiro.
+
 ```c
 int get_size_of_file(FILE *file);
 int get_no_of_bits(int n);
 ```
+
 # 4. Casos de usos principais
 
 Em cada um dos casos estará descrito o fluxo lógico de execução.
@@ -261,13 +267,48 @@ O programa também sucedeu com ficheiros de diferentes tamanhos:
 
 # 8. Eficiência do protocolo de ligação de dados
 
-## 8.1. Variar ```Frame Error Ratio``` 
+Devido ao tamanho das tabelas e figuras, para melhor respeitar o limite de páginas imposto, estas encontram-se no anexo.
+
+## 8.1. Variar ```Frame Error Ratio```
+
+```c
+if((rand % 10000) * 100 < FRAME_ERROR) {
+    frame[INFORMATION_HEADER_SIZE + 5] ^= ba;
+}
+llwrite(frame);
+// Restaurar sanidade da trama
+frame[INFORMATION_HEADER_SIZE + 5] ^= ba;
+```
+
+Ao introduzir aleatoriamente geração do *flip* de um byte de dados da trama de informação, observou-se que quanto maior
+o valor do frame error ratio, o programa vai estar durante mais tempo a reenviar tramas uma vez que o recetor envia um
+sinal de rejeição mais frequentemente.
+
+É interessante notar que os valores tendem a aumentar muito nos primeiros 10%, sendo a taxa de aumento reduzida entre mais 10
+e 50% e depois mais acentuada até aos 75%.
 
 ## 8.2. Variar tempo de propagação
 
+De um modo geral, a aumentar o tempo de propagação a eficiência sofre uma penalização, uma vez que fica a demorar
+mais um pacote chegar ao outro lado.
+
+Contudo, pela figura 4, observa-se que aumentos de 0.5 não apresentam alterações significativas de perda de eficiência, sendo
+ao contrário para aumentos de mais do que 1 segundo.
+
 ## 8.3. Variar capacidade de ligação
 
+Ao aumentar a capacidade de ligação, aumentamos o número de bits por segundo que conseguem estar a ser transmitidos
+através da porta série, o que significa que até um certo limite, ao aumentarmos a capacidade de ligação vamos estar a
+aumentar a performance.
+
+Para valores abaixo ou equivalente a 1200 de baudrate, o programa não corre nas devidas condições devido ao tempo que
+um pacote vai demorar a ser enviado.
+
 ## 8.4. Variar tamanho das tramas
+
+Quanto maior o número de tramas menor será o número de transmissões, o que significa que num contexto em que não
+ocorre erros a transmissão demorará menos tempo, apesar de que entre os valores testados a diferença não é assim tão
+significativa, como pode ser observado na figura 2.
 
 # 9. Conclusões
 
@@ -278,3 +319,195 @@ de um ficheiro de uma porta série para outra.
 Para além disso, em termos de aprendizagem, este trabalho foi bastante útil para uma melhor
 compreensão acerca de *byte stuffing*, assim como o mecanismo de transmissão e controlo de erros ```Stop and Wait```, tal como uma primeira experiência real com um dispositivo físico onde nem tudo funciona
 tão bem como num meio virtual.
+
+\newpage
+
+# 10. Anexos
+
+## 10.1. Código
+
+Encontra-se na paste ```/code```.
+
+## 10.2. Figuras
+
+\begin{table}[htbp]
+  \centering
+  \begin{tabular}{crrr}
+    \hline
+    FER $(\%)$ & Tempo $(s)$ & Bitrate (Bit/s) & Eficiência $(\%)$ \\
+    \hline
+    0 & 12.964149 & 6768.203605 & 70.50 \\
+    10 & 16.108527 & 5447.0529 & 56.74 \\
+    20 & 17.303611 & 5070.849084 & 52.82 \\
+    25 & 18.497586 & 4743.537886 & 49.41 \\
+    50 & 19.521349 & 4494.771339 & 46.82 \\
+    75 & 23.270911 & 3770.544264 & 39.27 \\
+    \hline
+  \end{tabular}
+  \caption{Eficiência por Frame Error Ratio}
+  \label{tab:data}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      xlabel={FER},
+      ylabel={Eficiência},
+      xmode=log,
+      ymode=log,
+      ytick scale label code/.code={},
+      xtick scale label code/.code={},
+      yticklabel={\pgfmathparse{exp(\tick)}\pgfmathprintnumber{\pgfmathresult}},
+      xticklabel={\pgfmathparse{exp(\tick)}\pgfmathprintnumber{\pgfmathresult}},
+      ]
+      \addplot table[x=x,y=y] {
+        x y
+        0.1 70.50
+        10 56.74
+        20 52.82
+        25 49.41
+        50 46.82
+        75 39.27
+      };
+    \end{axis}
+  \end{tikzpicture}
+  \caption{Eficiência / Frame Error Ratio}
+  \label{fig:graph}
+\end{figure}
+
+\newpage
+
+\begin{table}[htbp]
+  \centering
+  \begin{tabular}{crrr}
+    \hline
+     Tamanho dos pacotes $(Bytes)$ & Tempo $(s)$ & Bitrate (Bit/s) & Eficiência $(\%)$ \\
+    \hline
+    512 & 13.043 & 6727.203605 & 70.08 \\
+    700 & 12.919 & 6791.856955 & 70.75 \\
+    1024 & 12.864 & 6820.895522 & 71.05 \\
+    2048 & 12.531 & 7002.154656 & 72.94 \\
+    \hline
+  \end{tabular}
+  \caption{Eficiência tamanho do pacote}
+  \label{tab:data}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      xlabel={Tamanho do pacote},
+      ylabel={Eficiência},
+      xmode=log,
+      ymode=log,
+      ytick scale label code/.code={},
+      xtick scale label code/.code={},
+      yticklabel={\pgfmathparse{exp(\tick)}\pgfmathprintnumber{\pgfmathresult}},
+      xticklabel={\pgfmathparse{exp(\tick)}\pgfmathprintnumber{\pgfmathresult}},
+      ]
+      \addplot table[x=x,y=y] {
+        x y
+        512 70.08
+        700 70.75
+        1024 71.05
+        2048 72.94
+      };
+    \end{axis}
+  \end{tikzpicture}
+  \caption{Eficiência / Tamanho do pacote}
+  \label{fig:graph}
+\end{figure}
+
+\newpage
+
+\begin{table}[htbp]
+  \centering
+  \begin{tabular}{crrr}
+    \hline
+     Baudrate $(Baud/s)$ & Tempo $(s)$ & Bitrate (Bit/s) & Eficiência $(\%)$ \\
+    \hline
+    2400 & 14.024969 & 6256.27051 & 56.17 \\
+    9600 & 12.864 & 6820.895522 & 71.05 \\
+    38600 & 11.693 & 7503.78550 & 78.16 \\
+    115200 & 11.670 & 7518.93156 & 78.32 \\
+    256000 & 11.687 & 7507.82921 & 78.21 \\
+    \hline
+  \end{tabular}
+  \caption{Eficiência por baud rate}
+  \label{tab:data}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      xlabel={Tamanho do pacote},
+      ylabel={Eficiência},
+      xmode=log,
+      ymode=log,
+      ytick scale label code/.code={},
+      xtick scale label code/.code={},
+      tick scale binop=\times,
+      yticklabel={\pgfmathparse{exp(\tick)}\pgfmathprintnumber{\pgfmathresult}},
+      ]
+      \addplot table[x=x,y=y] {
+        x y
+        002400 56.17
+        009600 71.05
+        115200 78.32
+      };
+    \end{axis}
+  \end{tikzpicture}
+  \caption{Eficiência / Baudrate}
+  \label{fig:graph}
+\end{figure}
+
+\newpage
+
+\begin{table}[htbp]
+  \centering
+  \begin{tabular}{crrr}
+    \hline
+     TProp $(s)$ & Tempo $(s)$ & Bitrate (Bit/s) & Eficiência $(\%)$ \\
+    \hline
+    0 & 12.864 & 6820.8955 & 71.05 \\
+    0.2 & 13.0124 & 6742.1066 & 70.02 \\
+    0.5 & 13.2100 & 6642.2407 & 69.19 \\
+    1 & 14.916138 & 5882.58781 & 61.28 \\
+    1.5 & 14.921172 & 5880.50322 & 61.26 \\
+    2 & 26.008912 & 3373.61286 & 35.14 \\
+    \hline
+  \end{tabular}
+  \caption{Eficiência por tempo de propagação}
+  \label{tab:data}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      xlabel={Tempo de Propagação},
+      ylabel={Eficiência},
+      xmode=log,
+      ymode=log,
+      ytick scale label code/.code={},
+      xtick scale label code/.code={},
+      yticklabel={\pgfmathparse{exp(\tick)}\pgfmathprintnumber{\pgfmathresult}},
+      xticklabel={\pgfmathparse{exp(\tick)}\pgfmathprintnumber{\pgfmathresult}},
+      ]
+      \addplot table[x=x,y=y] {
+        x y
+        0 71.05
+        0.2 70.02
+        0.5 69.19
+        1 61.28
+        1.5 61.26
+        2 35.14
+      };
+    \end{axis}
+  \end{tikzpicture}
+  \caption{Eficiência / Tempo de Propagação}
+  \label{fig:graph}
+\end{figure}
