@@ -10,6 +10,12 @@ header-includes:
     \usepackage{pgfplotstable}
 ---
 
+# 0. Sumário
+
+Este relatório é acerca de um trabalho de redes de computadores com o objetivo de desenvolver um protocolo de transferência de
+dados entre duas porta série.
+Com este trabalho foi conseguida a aprendizagem de mecanismos de transferência de controlo de erros, tal como o *Stop and wait*
+, assim como as verdadeiras limitações de transferência de dados de um meio físico.
 
 # 1. Introdução
 
