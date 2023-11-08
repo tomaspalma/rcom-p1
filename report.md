@@ -443,7 +443,7 @@ Encontra-se na paste ```/code```.
   \centering
   \begin{tikzpicture}
     \begin{axis}[
-      xlabel={Tamanho do pacote},
+      xlabel={Baudrate},
       ylabel={Eficiência},
       xmode=log,
       ymode=log,
