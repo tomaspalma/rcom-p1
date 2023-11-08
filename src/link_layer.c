@@ -94,7 +94,6 @@ void recv_supervision_state_machine(unsigned char address_byte,
       else
         set_state = START_RCV;
     } else if (set_state == BCC_RCV) {
-      printf("What the actual fuck: %d", recv_set == DELIMETER);
       if (recv_set == DELIMETER)
         stop = TRUE;
       else
@@ -259,7 +258,7 @@ int stop_and_wait(unsigned char *frame, int size) {
       printf("Send tries is: %d\n", send_tries);
       if (send_tries > N_TRIES) {
         printf("Send tries excedded\n");
-        return -1;
+        exit(0);
       }
 
       number_of_sender_retries++;
@@ -582,7 +581,7 @@ int start_time = 0;
          (number_of_errors_detected / (double)total_frames) * 100);
   double time_taken = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
   printf("Bitrate is: %f\n", (total_bytes * 8) / time_taken);
-  printf("Time taken was: %f seconds\n", time_taken);
+  printf("Time taken was: %f\n", time_taken);
   printf("------------------\n");
 }
 
